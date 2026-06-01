@@ -123,7 +123,7 @@ function loadCustomers() {
         <thead><tr><th>Naam</th><th>Email</th><th>TV's</th><th>Limiet</th><th>Status</th><th>Datum</th><th></th></tr></thead>
         <tbody>${r.data.map(c => `
           <tr>
-            <td><a href="#" onclick="navigate('customer/${c.id}')" style="color:#4361ee;text-decoration:none;font-weight:500">${escapeHtml(c.name)}</a></td>
+            <td><a href="javascript:void(0)" onclick="navigate('customer/${c.id}')" style="color:#4361ee;text-decoration:none;font-weight:500">${escapeHtml(c.name)}</a></td>
             <td>${escapeHtml(c.contact_email) || '-'}</td>
             <td>${c.tv_count}</td>
             <td>${c.tv_limit}</td>
