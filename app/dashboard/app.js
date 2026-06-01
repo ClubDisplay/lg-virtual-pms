@@ -275,8 +275,21 @@ window.regenerateKey = async function(id) {
 };
 
 window.copyKey = function() {
-  const key = document.getElementById('apiKeyValue').textContent;
-  navigator.clipboard.writeText(key).then(() => alert('API key gekopieerd!'));
+  const el = document.getElementById('apiKeyValue');
+  const key = el.textContent;
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(key).then(() => alert('API key gekopieerd!'));
+  } else {
+    const textarea = document.createElement('textarea');
+    textarea.value = key;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    alert('API key gekopieerd!');
+  }
 };
 
 window.toggleCustomerStatus = async function(id) {
