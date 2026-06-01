@@ -1,0 +1,7 @@
+[build]
+  publish = "app"
+
+[[redirects]]
+  from = "/autocheckout"
+  to = "/"
+  status = 200
