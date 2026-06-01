@@ -4,14 +4,18 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use('/autocheckout', (req, res, next) => {
+app.use((req, res, next) => {
   const { debug, hour, min } = req.query;
-  console.log(`debug: ${debug}, hour: ${hour}, min: ${min}`);
+  if (req.path === '/index.html' || req.path === '/') {
+    console.log(`debug: ${debug}, hour: ${hour}, min: ${min}`);
+  }
   next();
-}, express.static(path.join(__dirname, 'app')));
+});
+
+app.use(express.static(path.join(__dirname, 'app')));
 
 app.get('/', (req, res) => {
-  res.send('Virtual PMS - Access: /autocheckout?debug=on&hour=11&min=00');
+  res.sendFile(path.join(__dirname, 'app', 'index.html'));
 });
 
 app.listen(PORT, () => {
