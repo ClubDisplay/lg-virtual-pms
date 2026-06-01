@@ -185,7 +185,10 @@ app.post('/api/checkout/log', (req, res) => {
 
 app.use('/admin', express.static(path.join(__dirname, 'app', 'dashboard')));
 
-app.get('/admin*', (req, res) => {
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'app', 'dashboard', 'index.html'));
+});
+app.get('/admin/:page', (req, res) => {
   res.sendFile(path.join(__dirname, 'app', 'dashboard', 'index.html'));
 });
 
