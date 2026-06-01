@@ -18,10 +18,10 @@
     let debugOption = "off";
     let apiKey = "";
     let customerId = null;
-    let tvId = null;
+    let deviceId = "";
 
     function log(msg) {
-      const el = document.getElementById("applist");
+      var el = document.getElementById("applist");
       if (el) el.innerHTML += msg + " <br/>";
     }
 
@@ -29,10 +29,31 @@
       return new URLSearchParams(window.location.search).get(name) || "";
     }
 
+    function getDeviceId() {
+      var id = localStorage.getItem("vps_device_id");
+      if (!id) {
+        id = "tv-" + crypto.randomUUID().slice(0, 8);
+        localStorage.setItem("vps_device_id", id);
+      }
+      return id;
+    }
+
+    function registerTv() {
+      return fetch("/api/checkout/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          api_key: apiKey,
+          device_id: deviceId,
+          label: deviceId
+        })
+      }).then(function(r) { return r.json(); });
+    }
+
     function validateApiKey() {
       return fetch("/api/checkout/validate?key=" + encodeURIComponent(apiKey))
-        .then(r => r.json())
-        .then(data => {
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
           if (data.valid) {
             customerId = data.customer_id;
             log("Klant: " + data.customer_name);
@@ -42,91 +63,77 @@
             return false;
           }
         })
-        .catch(err => {
+        .catch(function() {
           log("FOUT: Kan server niet bereiken");
           return false;
         });
     }
 
     function logCheckout(success, errorMsg) {
-      const body = {
-        api_key: apiKey,
-        tv_id: tvId || null,
-        success: success,
-        error_message: errorMsg || null,
-        ip_address: null,
-        user_agent: navigator.userAgent
-      };
       fetch("/api/checkout/log", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      }).catch(() => {});
+        body: JSON.stringify({
+          api_key: apiKey,
+          device_id: deviceId,
+          success: success,
+          error_message: errorMsg || null,
+          ip_address: null,
+          user_agent: navigator.userAgent
+        })
+      }).catch(function() {});
     }
 
-    const getCurrentSetting = () => {
-      try {
-        idcap.request("idcap://configuration/property/get", {
-          parameters: { key: "security_level" },
-          onSuccess: function (cbObject) {
-            log("security_level = " + cbObject.value);
-          },
-          onFailure: function () {}
-        });
-      } catch(e) {}
-    };
+    var tvIpAddress = "";
 
-    const setDebugSetting = () => {
+    var getTvInfo = function() {
       try {
-        let ip_address = "";
         idcap.request("idcap://network/configuration/get", {
           parameters: {},
-          onSuccess: function (cbObject) { ip_address = cbObject.wired.ipAddress; },
-          onFailure: function () {}
-        });
-        idcap.request("idcap://configuration/property/set", {
-          parameters: { key: "browser_debug_mode", value: "1" },
-          onSuccess: function () { log("Debug mode: On! URL= " + ip_address + ":2345"); },
-          onFailure: function () {}
+          onSuccess: function(cbObject) {
+            tvIpAddress = cbObject.wired && cbObject.wired.ipAddress || 
+                         cbObject.wireless && cbObject.wireless.ipAddress || "";
+          },
+          onFailure: function() {}
         });
       } catch(e) {}
     };
 
-    const destroyAllApplications = () => {
+    var destroyAllApplications = function() {
       try {
         idcap.request("idcap://application/list", {
           parameters: {},
-          onSuccess: function (s) {
+          onSuccess: function(s) {
             s.list.forEach(function(i) {
               idcap.request("idcap://application/destroy", {
                 parameters: { id: i.appId },
-                onSuccess: function () { log(i.appId + " gestopt"); },
-                onFailure: function () {}
+                onSuccess: function() { log(i.appId + " gestopt"); },
+                onFailure: function() {}
               });
             });
           },
-          onFailure: function () {}
+          onFailure: function() {}
         });
       } catch(e) {}
     };
 
-    const trigger_checkout = () => {
+    var trigger_checkout = function() {
       log("Checkout wordt uitgevoerd...");
       destroyAllApplications();
       try {
         idcap.request("idcap://tv/checkout/request", {
-          onSuccess: function () {
+          onSuccess: function() {
             log("Checkout geslaagd!");
             logCheckout(true, null);
           },
-          onFailure: function (f) {
+          onFailure: function(f) {
             var msg = f.errorMessage || "Onbekende fout";
             log("Checkout mislukt: " + msg);
             logCheckout(false, msg);
           }
         });
       } catch(e) {
-        log("IDCAP niet beschikbaar (test modus)");
+        log("IDCAP niet beschikbaar (simulatie)");
         logCheckout(true, "simulatie");
       }
     };
@@ -146,21 +153,24 @@
       hour = parseInt(getQueryParam("hour")) || 11;
       min = parseInt(getQueryParam("min")) || 0;
       debugOption = getQueryParam("debug") || "off";
-      tvId = getQueryParam("tv") || null;
 
       if (!apiKey) {
         log("FOUT: Geen API key opgegeven");
         return;
       }
 
+      deviceId = getDeviceId();
+      log("Apparaat: " + deviceId);
+
       validateApiKey().then(function(valid) {
         if (!valid) return;
-        if (debugOption === "on") {
-          document.body.style.display = "block";
-          setTimeout(getCurrentSetting, 2000);
-          setTimeout(setDebugSetting, 3000);
-        }
-        checkout_schedule();
+        registerTv().then(function() {
+          if (debugOption === "on") {
+            document.body.style.display = "block";
+            getTvInfo();
+          }
+          checkout_schedule();
+        });
       });
     }
   </script>

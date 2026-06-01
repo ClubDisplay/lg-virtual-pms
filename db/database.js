@@ -42,12 +42,18 @@ function initTables() {
     CREATE TABLE IF NOT EXISTS tvs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      device_id TEXT,
       label TEXT NOT NULL,
       room_name TEXT,
       last_checkout TEXT,
       last_checkout_ok INTEGER,
       created_at TEXT DEFAULT (datetime('now'))
     );
+
+    -- Migration: add device_id if missing (existing DBs)
+    BEGIN;
+    ALTER TABLE tvs ADD COLUMN device_id TEXT;
+    COMMIT;
 
     CREATE TABLE IF NOT EXISTS checkout_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

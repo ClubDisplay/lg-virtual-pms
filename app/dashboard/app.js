@@ -201,14 +201,18 @@ function renderCustomer(app) {
           <div class="table-container">
             ${tvs.length === 0 ? '<div class="empty">Nog geen TV\'s toegevoegd</div>' : `
             <table>
-              <thead><tr><th>Label</th><th>Kamer</th><th>Laatste checkout</th><th>Status</th><th></th></tr></thead>
+              <thead><tr><th>Label</th><th>Kamer</th><th>Apparaat-ID</th><th>Laatste checkout</th><th>Status</th><th></th></tr></thead>
               <tbody>${tvs.map(t => `
                 <tr>
                   <td>${escapeHtml(t.label)}</td>
                   <td>${escapeHtml(t.room_name) || '-'}</td>
+                  <td style="font-size:12px;color:#888;font-family:monospace">${t.device_id || '-'}</td>
                   <td>${t.last_checkout ? new Date(t.last_checkout).toLocaleString('nl-NL') : '-'}</td>
                   <td>${t.last_checkout_ok === 1 ? '<span class="badge success">OK</span>' : t.last_checkout_ok === 0 ? '<span class="badge error">Mislukt</span>' : '-'}</td>
-                  <td><button class="btn btn-danger btn-sm" onclick="deleteTv(${t.id})">Verwijder</button></td>
+                  <td nowrap>
+                    <button class="btn btn-ghost btn-sm" onclick="renameTv(${t.id}, '${escapeHtml(t.label)}')">Hernoem</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteTv(${t.id})">Verwijder</button>
+                  </td>
                 </tr>
               `).join('')}</tbody>
             </table>`}
@@ -258,6 +262,15 @@ window.showAddTv = function(cid) {
     if (res.ok) { closeModal(); navigate('customer/' + cid); }
     else alert(res.data.error || 'Fout bij toevoegen');
   });
+};
+
+window.renameTv = function(id, currentLabel) {
+  const label = prompt('Nieuw label voor deze TV:', currentLabel);
+  if (!label) return;
+  api('/tvs/' + id, {
+    method: 'PUT',
+    body: JSON.stringify({ label })
+  }).then(() => navigate('customer/' + state.customerId));
 };
 
 window.deleteTv = async function(id) {
