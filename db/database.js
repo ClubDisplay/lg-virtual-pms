@@ -50,10 +50,14 @@ function initTables() {
       created_at TEXT DEFAULT (datetime('now'))
     );
 
-    -- Migration: add device_id if missing (existing DBs)
-    BEGIN;
-    ALTER TABLE tvs ADD COLUMN device_id TEXT;
-    COMMIT;
+  `);
+
+  // Migration: add device_id column if it doesn't exist yet
+  try {
+    db.exec(`ALTER TABLE tvs ADD COLUMN device_id TEXT`);
+  } catch(e) {
+    // Column likely already exists, that's fine
+  }
 
     CREATE TABLE IF NOT EXISTS checkout_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
