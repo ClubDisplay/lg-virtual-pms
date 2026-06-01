@@ -50,15 +50,6 @@ function initTables() {
       created_at TEXT DEFAULT (datetime('now'))
     );
 
-  `);
-
-  // Migration: add device_id column if it doesn't exist yet
-  try {
-    db.exec(`ALTER TABLE tvs ADD COLUMN device_id TEXT`);
-  } catch(e) {
-    // Column likely already exists, that's fine
-  }
-
     CREATE TABLE IF NOT EXISTS checkout_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
@@ -71,6 +62,13 @@ function initTables() {
       created_at TEXT DEFAULT (datetime('now'))
     );
   `);
+
+  // Migration: add device_id column if it doesn't exist yet
+  try {
+    db.exec(`ALTER TABLE tvs ADD COLUMN device_id TEXT`);
+  } catch(e) {
+    // Column likely already exists, that's fine
+  }
 
   const count = db.prepare('SELECT COUNT(*) as c FROM users').get();
   if (count.c === 0) {
