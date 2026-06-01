@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Auto Checkout App</title>
+  <title>Virtual PMS</title>
   <style>
     body { margin: 0; display: none; background: transparent; }
-    #applist { font-size: 15px; }
+    #applist { font-size: 14px; font-family: monospace; color: #333; padding: 10px; }
   </style>
 </head>
 <body onload="init();">
@@ -13,142 +13,155 @@
 
   <script src="idcap.js"></script>
   <script>
-    let millisTillCheckout = 0;
     let hour = 11;
     let min = 0;
     let debugOption = "off";
+    let apiKey = "";
+    let customerId = null;
+    let tvId = null;
+
+    function log(msg) {
+      const el = document.getElementById("applist");
+      if (el) el.innerHTML += msg + " <br/>";
+    }
+
+    function getQueryParam(name) {
+      return new URLSearchParams(window.location.search).get(name) || "";
+    }
+
+    function validateApiKey() {
+      return fetch("/api/checkout/validate?key=" + encodeURIComponent(apiKey))
+        .then(r => r.json())
+        .then(data => {
+          if (data.valid) {
+            customerId = data.customer_id;
+            log("Klant: " + data.customer_name);
+            return true;
+          } else {
+            log("FOUT: " + (data.error || "Ongeldige API key"));
+            return false;
+          }
+        })
+        .catch(err => {
+          log("FOUT: Kan server niet bereiken");
+          return false;
+        });
+    }
+
+    function logCheckout(success, errorMsg) {
+      const body = {
+        api_key: apiKey,
+        tv_id: tvId || null,
+        success: success,
+        error_message: errorMsg || null,
+        ip_address: null,
+        user_agent: navigator.userAgent
+      };
+      fetch("/api/checkout/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      }).catch(() => {});
+    }
 
     const getCurrentSetting = () => {
-      idcap.request("idcap://configuration/property/get", {
-        parameters: { key: "security_level" },
-        onSuccess: function (cbObject) {
-          document.getElementById("applist").innerHTML += `security_level = ${cbObject.value} <br/>`;
-        },
-        onFailure: function (err) {}
-      });
+      try {
+        idcap.request("idcap://configuration/property/get", {
+          parameters: { key: "security_level" },
+          onSuccess: function (cbObject) {
+            log("security_level = " + cbObject.value);
+          },
+          onFailure: function () {}
+        });
+      } catch(e) {}
     };
 
     const setDebugSetting = () => {
-      console.log("debug is enabled.");
-      let ip_address = "";
-      idcap.request("idcap://network/configuration/get", {
-        parameters: {},
-        onSuccess: function (cbObject) {
-          ip_address = cbObject.wired.ipAddress;
-        },
-        onFailure: function (err) {}
-      });
-      idcap.request("idcap://configuration/property/set", {
-        parameters: { key: "browser_debug_mode", value: "1" },
-        onSuccess: function () {
-          document.getElementById("applist").innerHTML += `Debug mode: On! URL= ${ip_address}:2345 <br/>`;
-        },
-        onFailure: function (err) {}
-      });
-    };
-
-    const destroyApplication = (appId) => {
-      document.getElementById("applist").innerHTML += `${appId} is unloaded. <br/>`;
-      idcap.request("idcap://application/destroy", {
-        parameters: { id: appId },
-        onSuccess: function () {
-          console.log("onSuccess");
-        },
-        onFailure: function (f) {
-          console.log("onFailure : errorMessage = " + f.errorMessage);
-        }
-      });
+      try {
+        let ip_address = "";
+        idcap.request("idcap://network/configuration/get", {
+          parameters: {},
+          onSuccess: function (cbObject) { ip_address = cbObject.wired.ipAddress; },
+          onFailure: function () {}
+        });
+        idcap.request("idcap://configuration/property/set", {
+          parameters: { key: "browser_debug_mode", value: "1" },
+          onSuccess: function () { log("Debug mode: On! URL= " + ip_address + ":2345"); },
+          onFailure: function () {}
+        });
+      } catch(e) {}
     };
 
     const destroyAllApplications = () => {
-      idcap.request( "idcap://application/list" , {
-          "parameters": {},
-          "onSuccess": function (s) {
-              console.log("onSuccess : list length = " + s.list.length);
-              const appIdList = s.list.map((i) => {
-                const appId = i.appId;
-                idcap.request("idcap://application/destroy", {
-                  parameters: { id: appId },
-                  onSuccess: function () {
-                    console.log(`${appId} is unloading...onSuccess`);
-                    document.getElementById("applist").innerHTML += `${appId} is unloading...onSuccess<br/>`;
-                  },
-                  onFailure: function (f) {
-                    console.log("onFailure : errorMessage = " + f.errorMessage);
-                  }
-                });
-                return appId;
+      try {
+        idcap.request("idcap://application/list", {
+          parameters: {},
+          onSuccess: function (s) {
+            s.list.forEach(function(i) {
+              idcap.request("idcap://application/destroy", {
+                parameters: { id: i.appId },
+                onSuccess: function () { log(i.appId + " gestopt"); },
+                onFailure: function () {}
               });
-              console.log(appIdList);
+            });
           },
-          "onFailure": function (err) {
-              console.log("onFailure : errorMessage = " + err.errorMessage);
-          }
-      });
+          onFailure: function () {}
+        });
+      } catch(e) {}
     };
 
     const trigger_checkout = () => {
+      log("Checkout wordt uitgevoerd...");
       destroyAllApplications();
-      document.getElementById("applist").innerHTML += `TV checkout now! <br/>`;
-      idcap.request("idcap://tv/checkout/request", {
-        onSuccess: function () {
-          document.getElementById("applist").innerHTML += `Checkout done<br/>`;
-        },
-        onFailure: function (f) {
-          console.log("onFailure : errorMessage = " + f.errorMessage);
-        }
-      });
-    };
-
-    const checkout_delay = () => {
-      const now = new Date();
-      millisTillCheckout = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, min, 0) - now;
-      if ((millisTillCheckout > 0) && (millisTillCheckout < 30000)) {
-        trigger_checkout();
-      } else {
-        console.log(`TV will checkout in ${millisTillCheckout} msec`);
+      try {
+        idcap.request("idcap://tv/checkout/request", {
+          onSuccess: function () {
+            log("Checkout geslaagd!");
+            logCheckout(true, null);
+          },
+          onFailure: function (f) {
+            var msg = f.errorMessage || "Onbekende fout";
+            log("Checkout mislukt: " + msg);
+            logCheckout(false, msg);
+          }
+        });
+      } catch(e) {
+        log("IDCAP niet beschikbaar (test modus)");
+        logCheckout(true, "simulatie");
       }
     };
 
     function checkout_schedule() {
-      if (hour === 99) {
-        trigger_checkout();
-      } else {
-        const now = new Date();
-        millisTillCheckout = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, min, 0) - now;
-        if (millisTillCheckout < 0) {
-          millisTillCheckout += 86400000;
-        }
-        document.getElementById("applist").innerHTML += 
-          `TV will check out in ${msToHMS(millisTillCheckout)} `
-          +`from now (${now.getHours()}:${now.getMinutes()}:${now.getSeconds()})!<br/>`;
-        setTimeout(trigger_checkout, millisTillCheckout);
-      }
+      var now = new Date();
+      var target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, min, 0);
+      var ms = target - now;
+      if (ms < 0) ms += 86400000;
+      log("Checkout om " + String(hour).padStart(2, '0') + ":" + String(min).padStart(2, '0'));
+      log("Over " + Math.round(ms / 60000) + " minuten");
+      setTimeout(trigger_checkout, ms);
     }
 
     function init() {
-      const searchParams = new URLSearchParams(window.location.search);
-      debugOption = searchParams.get('debug') || "off";
-      hour = Number(searchParams.get('hour') || 11);
-      min = Number(searchParams.get('min') || 0);
-      document.getElementById("applist").innerHTML += `debugOption = ${debugOption} <br/>`;
-      document.getElementById("applist").innerHTML += `checkout at ${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')} <br/>`;
-      if (debugOption === "on") {
-        document.body.style.display = "block";
-        setTimeout(getCurrentSetting, 2000);
-        setTimeout(setDebugSetting, 3000);
-      }
-      setTimeout(checkout_schedule, 4000);
-    }
+      apiKey = getQueryParam("key");
+      hour = parseInt(getQueryParam("hour")) || 11;
+      min = parseInt(getQueryParam("min")) || 0;
+      debugOption = getQueryParam("debug") || "off";
+      tvId = getQueryParam("tv") || null;
 
-    function msToHMS(ms) {
-      let totalSeconds = Math.floor(ms / 1000);
-      let hours = Math.floor(totalSeconds / 3600);
-      let minutes = Math.floor((totalSeconds % 3600) / 60);
-      let seconds = totalSeconds % 60;
-      return `${hours.toString().padStart(2, '0')}:`
-           + `${minutes.toString().padStart(2, '0')}:`
-           + `${seconds.toString().padStart(2, '0')}`;
+      if (!apiKey) {
+        log("FOUT: Geen API key opgegeven");
+        return;
+      }
+
+      validateApiKey().then(function(valid) {
+        if (!valid) return;
+        if (debugOption === "on") {
+          document.body.style.display = "block";
+          setTimeout(getCurrentSetting, 2000);
+          setTimeout(setDebugSetting, 3000);
+        }
+        checkout_schedule();
+      });
     }
   </script>
 </body>
