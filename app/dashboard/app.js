@@ -85,8 +85,9 @@ function layout(content, active) {
   return `
     <div class="dashboard">
       <div class="sidebar">
-        <div style="padding: 16px 20px 12px; text-align: center;">
-          <img src="LogoCDVP.png" alt="CDVP" style="max-width: 120px; height: auto; display: block; margin: 0 auto;">
+        <div style="padding: 16px 20px 8px; text-align: center;">
+          <img src="LogoCDVP.png" alt="CDVP" style="max-width: 100px; height: auto; display: block; margin: 0 auto 6px;">
+          <div style="font-size: 13px; color: rgba(255,255,255,0.6); letter-spacing: 1px;">Virtual PMS</div>
         </div>
         <div class="subtitle">Beheerpaneel</div>
         <nav>
