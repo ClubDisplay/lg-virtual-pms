@@ -4,12 +4,11 @@
   <meta charset="UTF-8">
   <title>Auto Checkout App</title>
   <style>
-    body { background-color: pink; }
+    body { margin: 0; display: none; background: transparent; }
     #applist { font-size: 15px; }
   </style>
 </head>
 <body onload="init();">
-  <h1>Auto Checkout App is loading...</h1>
   <p id="applist"></p>
 
   <script src="idcap.js"></script>
@@ -135,10 +134,9 @@
       document.getElementById("applist").innerHTML += `debugOption = ${debugOption} <br/>`;
       document.getElementById("applist").innerHTML += `checkout at ${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')} <br/>`;
       if (debugOption === "on") {
+        document.body.style.display = "block";
         setTimeout(getCurrentSetting, 2000);
         setTimeout(setDebugSetting, 3000);
-      } else {
-        document.getElementsByTagName("body")[0].style.display = "none";
       }
       setTimeout(checkout_schedule, 4000);
     }
