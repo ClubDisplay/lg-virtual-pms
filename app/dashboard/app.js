@@ -85,11 +85,10 @@ function layout(content, active) {
   return `
     <div class="dashboard">
       <div class="sidebar">
-        <div style="padding: 16px 20px 8px; text-align: center;">
-          <img src="LogoCDVP.png" alt="CDVP" style="max-width: 100px; height: auto; display: block; margin: 0 auto 6px;">
-          <div style="font-size: 13px; color: rgba(255,255,255,0.6); letter-spacing: 1px;">Virtual PMS</div>
+        <div style="padding: 24px 20px 20px; text-align: center;">
+          <img src="LogoCDVP.png" alt="CDVP" style="max-width: 140px; height: auto; display: block; margin: 0 auto 10px;">
+          <div style="font-size: 16px; color: rgba(255,255,255,0.7); letter-spacing: 2px; font-weight: 600;">Virtual PMS</div>
         </div>
-        <div class="subtitle">Beheerpaneel</div>
         <nav>
           <a class="${active === 'dashboard' ? 'active' : ''}" onclick="navigate('dashboard')"><span class="icon">📊</span> <span>Dashboard</span></a>
           <a class="${active === 'customers' ? 'active' : ''}" onclick="navigate('customers')"><span class="icon">👥</span> <span>Klanten</span></a>
