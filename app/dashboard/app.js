@@ -193,6 +193,20 @@ function renderCustomer(app) {
             <div class="stat-card"><div class="label">Aangemaakt</div><div>${new Date(customer.created_at).toLocaleDateString('nl-NL')}</div></div>
           </div>
 
+          <div class="stat-card" style="grid-column:1/-1">
+            <div class="label">Iframe code — plak dit in PCC tekst widget (HTML modus)</div>
+            <div class="api-key"><span id="iframeCode" style="font-size:12px;white-space:pre-wrap;word-break:break-all">&lt;iframe 
+  src="http://91.99.115.169/?key=${customer.api_key}&amp;hour=11&amp;min=0" 
+  sandbox="allow-same-origin allow-scripts" 
+  scrolling="no" 
+  height="100%" 
+  width="100%" 
+  frameborder="0"&gt;
+&lt;/iframe&gt;</span>
+              <button onclick="copyIframe()">Kopieer iframe</button>
+            </div>
+          </div>
+
           <h2 style="margin-bottom:12px">TV's</h2>
           <div class="toolbar" style="margin-bottom:12px">
             <span style="font-size:13px;color:#888">${tvs.length} van ${customer.tv_limit} TV's gebruikt</span>
@@ -284,6 +298,24 @@ window.regenerateKey = async function(id) {
   const res = await api('/customers/' + id + '/regenerate-key', { method: 'POST' });
   if (res.ok) {
     document.getElementById('apiKeyValue').textContent = res.data.api_key;
+  }
+};
+
+window.copyIframe = function() {
+  const el = document.getElementById('iframeCode');
+  const code = el.textContent;
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(code).then(() => alert('Iframe code gekopieerd!'));
+  } else {
+    const textarea = document.createElement('textarea');
+    textarea.value = code;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    alert('Iframe code gekopieerd!');
   }
 };
 
