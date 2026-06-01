@@ -85,7 +85,9 @@ function layout(content, active) {
   return `
     <div class="dashboard">
       <div class="sidebar">
-        <h2>Virtual PMS</h2>
+        <div style="padding: 16px 20px 12px; text-align: center;">
+          <img src="LogoCDVP.png" alt="CDVP" style="max-width: 120px; height: auto; display: block; margin: 0 auto;">
+        </div>
         <div class="subtitle">Beheerpaneel</div>
         <nav>
           <a class="${active === 'dashboard' ? 'active' : ''}" onclick="navigate('dashboard')"><span class="icon">📊</span> <span>Dashboard</span></a>
