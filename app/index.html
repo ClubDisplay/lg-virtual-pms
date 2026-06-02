@@ -30,15 +30,21 @@
       return new URLSearchParams(window.location.search).get(name) || "";
     }
 
+    function generateId() {
+      try { return crypto.randomUUID().slice(0, 8); } catch(e) {}
+      try { return crypto.getRandomValues(new Uint32Array(1))[0].toString(36); } catch(e) {}
+      return Math.random().toString(36).slice(2, 10);
+    }
+
     function getDeviceId() {
       try {
         var id = localStorage.getItem("vps_device_id");
         if (id) return id;
-        id = "tv-" + crypto.randomUUID().slice(0, 8);
+        id = "tv-" + generateId();
         localStorage.setItem("vps_device_id", id);
         return id;
       } catch(e) {
-        return "tv-" + Math.random().toString(36).slice(2, 10);
+        return "tv-" + generateId();
       }
     }
 
