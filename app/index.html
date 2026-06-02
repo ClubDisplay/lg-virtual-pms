@@ -96,25 +96,44 @@
 
     var tvIpAddress = "";
 
+    function sendIp(ip) {
+      if (ip && customerId) {
+        tvIpAddress = ip;
+        fetch("/api/checkout/update-ip", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ api_key: apiKey, device_id: deviceId, ip_address: ip })
+        }).catch(function() {});
+      }
+    }
+
+    function getIpViaWebrtc() {
+      try {
+        var pc = new RTCPeerConnection({ iceServers: [] });
+        pc.createDataChannel("");
+        pc.createOffer().then(function(offer) { pc.setLocalDescription(offer); }).catch(function() {});
+        pc.onicecandidate = function(e) {
+          if (e.candidate) {
+            var m = e.candidate.candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3}/);
+            if (m && m[0] !== "217.100.65.146") sendIp(m[0]);
+            pc.close();
+          }
+        };
+        setTimeout(function() { try { pc.close(); } catch(e) {} }, 3000);
+      } catch(e) {}
+    }
+
     var getTvInfo = function() {
       try {
         idcap.request("idcap://network/configuration/get", {
           parameters: {},
           onSuccess: function(cbObject) {
-            tvIpAddress = cbObject.wired && cbObject.wired.ipAddress ||
-                         cbObject.wireless && cbObject.wireless.ipAddress || "";
-            // Stuur lokaal IP naar server
-            if (tvIpAddress && customerId) {
-              fetch("/api/checkout/update-ip", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ api_key: apiKey, device_id: deviceId, ip_address: tvIpAddress })
-              }).catch(function() {});
-            }
+            var ip = cbObject.wired && cbObject.wired.ipAddress || cbObject.wireless && cbObject.wireless.ipAddress || "";
+            sendIp(ip);
           },
-          onFailure: function() {}
+          onFailure: function() { getIpViaWebrtc(); }
         });
-      } catch(e) {}
+      } catch(e) { getIpViaWebrtc(); }
     };
 
     var destroyAllApplications = function() {
