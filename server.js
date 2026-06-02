@@ -206,6 +206,40 @@ app.get('/api/track/load', (req, res) => {
   res.json({ ok: true });
 });
 
+// Eenvoudige registratie via GET (voor HTML widgets zonder JS/fetch)
+app.get('/api/checkout/pixel', (req, res) => {
+  const { key, device_id } = req.query;
+  if (!key || !device_id) return res.status(400).end();
+  const customer = db.prepare('SELECT id, tv_limit FROM customers WHERE api_key = ? AND active = 1').get(key);
+  if (!customer) return res.status(404).end();
+  let tv = db.prepare('SELECT id FROM tvs WHERE customer_id = ? AND device_id = ?').get(customer.id, device_id);
+  if (!tv) {
+    const count = db.prepare('SELECT COUNT(*) as c FROM tvs WHERE customer_id = ?').get(customer.id).c;
+    if (count < customer.tv_limit) {
+      db.prepare('INSERT INTO tvs (customer_id, device_id, label) VALUES (?, ?, ?)').run(customer.id, device_id, device_id);
+    }
+  }
+  res.type('image/gif');
+  res.end('GIF89a\u0001\u0000\u0001\u0000\x80\x00\u0000\xff\xff\xff\x00\x00\x00!\xf9\u0004\u0000\u0000\u0000\u0000\u0000,\u0000\u0000\u0000\u0000\u0000\u0001\u0000\x01\u0000\x00\x02\u0002D\x01\u0000;', 'binary');
+});
+
+// Script-based iframe injector (voor HTML widgets die iframes filteren)
+app.get('/embed.js', (req, res) => {
+  res.type('application/javascript');
+  const key = req.query.key || '';
+  const hour = req.query.hour || '11';
+  const min = req.query.min || '0';
+  res.send(`
+(function(){
+  var f = document.createElement('iframe');
+  f.src = 'https://pms.clubdisplay.nl/?key=${encodeURIComponent(key)}&hour=${hour}&min=${min}';
+  f.sandbox = 'allow-same-origin allow-scripts';
+  f.style.cssText = 'width:100%;height:100%;border:none;position:absolute;top:0;left:0';
+  document.currentScript.parentNode.appendChild(f);
+})();
+  `.trim());
+});
+
 // === Checkout Endpoint (called by iframe with API key) ===
 
 app.get('/api/checkout/validate', (req, res) => {
