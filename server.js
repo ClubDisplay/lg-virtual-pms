@@ -10,6 +10,14 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
+// Request logging voor debugging (zonder API key)
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/checkout')) {
+    console.log('→', req.method, req.path, req.headers['origin'] || '-');
+  }
+  next();
+});
+
 // CORS — nodig voor iframe op PCC portal (ander domein)
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
