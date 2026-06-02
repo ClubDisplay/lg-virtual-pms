@@ -196,16 +196,14 @@ function renderCustomer(app) {
           </div>
 
           <div class="stat-card" style="grid-column:1/-1">
-            <div class="label">Iframe code — plak dit in PCC tekst widget (HTML modus)</div>
-            <div class="api-key"><span id="iframeCode" style="font-size:12px;white-space:pre-wrap;word-break:break-all">&lt;iframe 
-  src="https://pms.clubdisplay.nl/?key=${customer.api_key}&amp;hour=11&amp;min=0" 
-  sandbox="allow-same-origin allow-scripts" 
-  scrolling="no" 
-  height="100%" 
+            <div class="label">Widget code — plak dit in PCC tekst widget (HTML modus)</div>
+            <div class="api-key"><span id="widgetCode" style="font-size:12px;white-space:pre-wrap;word-break:break-all">&lt;object 
+  data="https://pms.clubdisplay.nl/?key=${customer.api_key}&amp;hour=11&amp;min=0" 
+  type="text/html" 
   width="100%" 
-  frameborder="0"&gt;
-&lt;/iframe&gt;</span>
-              <button onclick="copyIframe()">Kopieer iframe</button>
+  height="100%"&gt;
+&lt;/object&gt;</span>
+              <button onclick="copyWidget()">Kopieer code</button>
             </div>
           </div>
 
@@ -303,11 +301,11 @@ window.regenerateKey = async function(id) {
   }
 };
 
-window.copyIframe = function() {
-  const el = document.getElementById('iframeCode');
+window.copyWidget = function() {
+  const el = document.getElementById('widgetCode');
   const code = el.textContent;
   if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(code).then(() => alert('Iframe code gekopieerd!'));
+    navigator.clipboard.writeText(code).then(() => alert('Widget code gekopieerd!'));
   } else {
     const textarea = document.createElement('textarea');
     textarea.value = code;
@@ -317,7 +315,7 @@ window.copyIframe = function() {
     textarea.select();
     document.execCommand('copy');
     document.body.removeChild(textarea);
-    alert('Iframe code gekopieerd!');
+    alert('Widget code gekopieerd!');
   }
 };
 
