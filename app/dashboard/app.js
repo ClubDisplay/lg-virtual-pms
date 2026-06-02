@@ -215,12 +215,11 @@ function renderCustomer(app) {
           <div class="table-container">
             ${tvs.length === 0 ? '<div class="empty">Nog geen TV\'s toegevoegd</div>' : `
             <table>
-              <thead><tr><th>Label</th><th>Kamer</th><th>IP</th><th>Apparaat-ID</th><th>Laatste checkout</th><th>Status</th><th></th></tr></thead>
+              <thead><tr><th>Label</th><th>Kamer</th><th>Apparaat-ID</th><th>Laatste checkout</th><th>Status</th><th></th></tr></thead>
               <tbody>${tvs.map(t => `
                 <tr>
                   <td>${escapeHtml(t.label)}</td>
                   <td>${escapeHtml(t.room_name) || '-'}</td>
-                  <td style="font-size:12px;color:#888;font-family:monospace">${t.ip_address || '-'}</td>
                   <td style="font-size:12px;color:#888;font-family:monospace">${t.device_id || '-'}</td>
                   <td>${t.last_checkout ? new Date(t.last_checkout).toLocaleString('nl-NL') : '-'}</td>
                   <td>${t.last_checkout_ok === 1 ? '<span class="badge success">OK</span>' : t.last_checkout_ok === 0 ? '<span class="badge error">Mislukt</span>' : '-'}</td>
