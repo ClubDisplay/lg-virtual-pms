@@ -66,9 +66,12 @@ function initTables() {
   // Migration: add device_id column if it doesn't exist yet
   try {
     db.exec(`ALTER TABLE tvs ADD COLUMN device_id TEXT`);
-  } catch(e) {
-    // Column likely already exists, that's fine
-  }
+  } catch(e) {}
+
+  // Migration: add ip_address column
+  try {
+    db.exec(`ALTER TABLE tvs ADD COLUMN ip_address TEXT`);
+  } catch(e) {}
 
   const count = db.prepare('SELECT COUNT(*) as c FROM users').get();
   if (count.c === 0) {

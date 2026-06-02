@@ -193,9 +193,10 @@ app.post('/api/checkout/register', (req, res) => {
   if (tvCount >= cust.tv_limit) return res.status(400).json({ error: 'TV limiet bereikt' });
 
   // Auto-register this TV
+  const ip = req.headers['x-forwarded-for'] || req.ip;
   const result = db.prepare(
-    'INSERT INTO tvs (customer_id, device_id, label) VALUES (?, ?, ?)'
-  ).run(customer.id, device_id, label || device_id);
+    'INSERT INTO tvs (customer_id, device_id, label, ip_address) VALUES (?, ?, ?, ?)'
+  ).run(customer.id, device_id, label || device_id, ip);
 
   res.json({ id: result.lastInsertRowid, label: label || device_id, registered: true });
 });
@@ -216,7 +217,8 @@ app.get('/api/checkout/pixel', (req, res) => {
   if (!tv) {
     const count = db.prepare('SELECT COUNT(*) as c FROM tvs WHERE customer_id = ?').get(customer.id).c;
     if (count < customer.tv_limit) {
-      db.prepare('INSERT INTO tvs (customer_id, device_id, label) VALUES (?, ?, ?)').run(customer.id, device_id, device_id);
+      const ip = req.headers['x-forwarded-for'] || req.ip;
+      db.prepare('INSERT INTO tvs (customer_id, device_id, label, ip_address) VALUES (?, ?, ?, ?)').run(customer.id, device_id, device_id, ip);
     }
   }
   res.type('image/gif');
