@@ -112,7 +112,7 @@ app.post('/api/customers/:id/regenerate-key', requireAuth, (req, res) => {
 // === TVs ===
 
 app.get('/api/customers/:id/tvs', requireAuth, (req, res) => {
-  const tvs = db.prepare('SELECT * FROM tvs WHERE customer_id = ? ORDER BY label').all(req.params.id);
+  const tvs = db.prepare('SELECT * FROM tvs WHERE customer_id = ? ORDER BY created_at ASC').all(req.params.id);
   res.json(tvs);
 });
 
