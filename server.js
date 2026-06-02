@@ -225,6 +225,16 @@ app.get('/api/checkout/pixel', (req, res) => {
   res.end('GIF89a\u0001\u0000\u0001\u0000\x80\x00\u0000\xff\xff\xff\x00\x00\x00!\xf9\u0004\u0000\u0000\u0000\u0000\u0000,\u0000\u0000\u0000\u0000\u0000\u0001\u0000\x01\u0000\x00\x02\u0002D\x01\u0000;', 'binary');
 });
 
+// Update TV IP (via IDCAP lokaal IP)
+app.post('/api/checkout/update-ip', (req, res) => {
+  const { api_key, device_id, ip_address } = req.body;
+  if (!api_key || !device_id || !ip_address) return res.status(400).json({ error: 'missende velden' });
+  const customer = db.prepare('SELECT id FROM customers WHERE api_key = ?').get(api_key);
+  if (!customer) return res.status(404).end();
+  db.prepare('UPDATE tvs SET ip_address = ? WHERE customer_id = ? AND device_id = ?').run(ip_address, customer.id, device_id);
+  res.json({ ok: true });
+});
+
 // Script-based iframe injector (voor HTML widgets die iframes filteren)
 app.get('/embed.js', (req, res) => {
   res.type('application/javascript');

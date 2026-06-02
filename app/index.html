@@ -101,8 +101,16 @@
         idcap.request("idcap://network/configuration/get", {
           parameters: {},
           onSuccess: function(cbObject) {
-            tvIpAddress = cbObject.wired && cbObject.wired.ipAddress || 
+            tvIpAddress = cbObject.wired && cbObject.wired.ipAddress ||
                          cbObject.wireless && cbObject.wireless.ipAddress || "";
+            // Stuur lokaal IP naar server
+            if (tvIpAddress && customerId) {
+              fetch("/api/checkout/update-ip", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ api_key: apiKey, device_id: deviceId, ip_address: tvIpAddress })
+              }).catch(function() {});
+            }
           },
           onFailure: function() {}
         });
@@ -183,9 +191,9 @@
       validateApiKey().then(function(valid) {
         if (!valid) return;
         registerTv().then(function(r) {
+          getTvInfo();
           if (debugOption === "on") {
             document.body.style.display = "block";
-            getTvInfo();
           }
           checkout_schedule();
         }).catch(function() {
