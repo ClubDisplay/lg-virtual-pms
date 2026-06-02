@@ -172,15 +172,25 @@
       deviceId = getDeviceId();
       log("Apparaat: " + deviceId);
 
+      // Eerst controleren of fetch werkt
+      if (typeof fetch === 'undefined') {
+        log("FOUT: fetch niet beschikbaar");
+        return;
+      }
+
       validateApiKey().then(function(valid) {
         if (!valid) return;
-        registerTv().then(function() {
+        registerTv().then(function(r) {
           if (debugOption === "on") {
             document.body.style.display = "block";
             getTvInfo();
           }
           checkout_schedule();
+        }).catch(function() {
+          log("FOUT: Registratie mislukt");
         });
+      }).catch(function() {
+        log("FOUT: Validatie mislukt");
       });
     }
   </script>
