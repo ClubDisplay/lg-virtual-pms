@@ -203,7 +203,7 @@ app.post('/api/checkout/register', (req, res) => {
 
 // Track page load (for debugging)
 app.get('/api/track/load', (req, res) => {
-  console.log('📺 PAGE LOAD — origin:', req.headers.origin || '-', 'ua:', (req.headers['user-agent'] || '-').slice(0, 80));
+  console.log('📺 PAGE LOAD — origin:', req.headers.origin || '-', 'ip:', req.ip, 'xff:', req.headers['x-forwarded-for'] || '-', 'real:', req.headers['x-real-ip'] || '-', 'client:', req.headers['x-client-ip'] || '-', 'ua:', (req.headers['user-agent'] || '-').slice(0, 80));
   res.json({ ok: true });
 });
 
