@@ -1,5 +1,7 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
+const https = require('https');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
@@ -7,6 +9,7 @@ const { getDb, seedDemoData } = require('./db/database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const DOMAIN = process.env.DOMAIN || 'pms.clubdisplay.nl';
 
 app.use(express.json());
 
@@ -259,6 +262,21 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'app', 'index.html'));
 });
 
+// HTTP -> HTTPS redirect en HTTP server
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`HTTP Server running at http://localhost:${PORT}`);
 });
+
+// HTTPS server
+const sslPath = `/etc/letsencrypt/live/${DOMAIN}`;
+if (fs.existsSync(`${sslPath}/fullchain.pem`)) {
+  const httpsOptions = {
+    key: fs.readFileSync(`${sslPath}/privkey.pem`),
+    cert: fs.readFileSync(`${sslPath}/fullchain.pem`)
+  };
+  https.createServer(httpsOptions, app).listen(443, () => {
+    console.log(`HTTPS Server running at https://${DOMAIN}`);
+  });
+} else {
+  console.log('Geen SSL certificaat gevonden, HTTPS niet gestart');
+}
