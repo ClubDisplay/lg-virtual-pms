@@ -199,7 +199,7 @@ function renderCustomer(app) {
             <div class="label">Iframe code — plak dit in PCC tekst widget (HTML modus)</div>
             <div class="api-key"><span id="iframeCode" style="font-size:12px;white-space:pre-wrap;word-break:break-all">&lt;iframe 
   src="http://91.99.115.169/?key=${customer.api_key}&amp;hour=11&amp;min=0" 
-  sandbox="allow-scripts" 
+  sandbox="allow-same-origin allow-scripts" 
   scrolling="no" 
   height="100%" 
   width="100%" 

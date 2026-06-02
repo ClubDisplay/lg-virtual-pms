@@ -31,12 +31,15 @@
     }
 
     function getDeviceId() {
-      var id = localStorage.getItem("vps_device_id");
-      if (!id) {
+      try {
+        var id = localStorage.getItem("vps_device_id");
+        if (id) return id;
         id = "tv-" + crypto.randomUUID().slice(0, 8);
         localStorage.setItem("vps_device_id", id);
+        return id;
+      } catch(e) {
+        return "tv-" + Math.random().toString(36).slice(2, 10);
       }
-      return id;
     }
 
     function registerTv() {
