@@ -172,6 +172,8 @@
       deviceId = getDeviceId();
       log("Apparaat: " + deviceId);
 
+      fetch('/api/track/load?k=' + apiKey.slice(0, 8)).catch(function() {});
+
       // Eerst controleren of fetch werkt
       if (typeof fetch === 'undefined') {
         log("FOUT: fetch niet beschikbaar");
