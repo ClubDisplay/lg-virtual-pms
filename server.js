@@ -7,6 +7,22 @@ const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const { getDb, seedDemoData } = require('./db/database');
 
+// Laad .env bestand als het bestaat (zonder externe dependencies)
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+  for (const line of fs.readFileSync(envPath, 'utf-8').split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#')) {
+      const idx = trimmed.indexOf('=');
+      if (idx > 0) {
+        const key = trimmed.slice(0, idx).trim();
+        const val = trimmed.slice(idx + 1).trim();
+        if (!process.env[key]) process.env[key] = val;
+      }
+    }
+  }
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DOMAIN = process.env.DOMAIN || 'pms.clubdisplay.nl';
@@ -31,7 +47,7 @@ app.use((req, res, next) => {
 });
 
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'virtual-pms-secret-change-me',
+  secret: process.env.SESSION_SECRET || (() => { console.error('WAARSCHUWING: SESSION_SECRET niet gezet, gebruik fallback — NIET veilig voor productie'); return 'dev-fallback-' + uuidv4(); })(),
   resave: false,
   saveUninitialized: false,
   cookie: { maxAge: 24 * 60 * 60 * 1000 }
