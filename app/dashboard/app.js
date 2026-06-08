@@ -21,6 +21,7 @@ function navigate(hash) {
 let state = { view: 'login', customerId: null };
 
 function render() {
+  closeModal();
   const hash = window.location.hash.slice(1) || 'dashboard';
   const app = document.getElementById('app');
 
@@ -151,7 +152,8 @@ window.showAddCustomer = function() {
       method: 'POST',
       body: JSON.stringify({ name, contact_email: document.getElementById('f_email').value, tv_limit: parseInt(document.getElementById('f_limit').value) || 1 })
     });
-    if (res.ok) { closeModal(); loadCustomers(); }
+    closeModal();
+    if (res.ok) { loadCustomers(); }
     else alert(res.data.error || 'Fout bij aanmaken');
   });
 };
@@ -215,10 +217,11 @@ function renderCustomer(app) {
           <div class="table-container">
             ${tvs.length === 0 ? '<div class="empty">Nog geen TV\'s toegevoegd</div>' : `
             <table>
-              <thead><tr><th>Label</th><th>Kamer</th><th>Apparaat-ID</th><th>Laatste checkout</th><th>Status</th><th></th></tr></thead>
+              <thead><tr><th>Label</th><th>Serienummer</th><th>Kamer</th><th>Apparaat-ID</th><th>Laatste checkout</th><th>Status</th><th></th></tr></thead>
               <tbody>${tvs.map(t => `
                 <tr>
                   <td>${escapeHtml(t.label)}</td>
+                  <td style="font-size:12px;color:#888;font-family:monospace">${escapeHtml(t.serial_number) || '-'}</td>
                   <td>${escapeHtml(t.room_name) || '-'}</td>
                   <td style="font-size:12px;color:#888;font-family:monospace">${t.device_id || '-'}</td>
                   <td>${t.last_checkout ? new Date(t.last_checkout).toLocaleString('nl-NL') : '-'}</td>
@@ -273,7 +276,8 @@ window.showAddTv = function(cid) {
       method: 'POST',
       body: JSON.stringify({ label, room_name: document.getElementById('f_tv_room').value })
     });
-    if (res.ok) { closeModal(); navigate('customer/' + cid); }
+    closeModal();
+    if (res.ok) { navigate('customer/' + cid); }
     else alert(res.data.error || 'Fout bij toevoegen');
   });
 };

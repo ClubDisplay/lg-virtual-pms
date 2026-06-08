@@ -51,3 +51,11 @@ pm2 start ecosystem.config.cjs  # Productie met PM2
 - Draait op Hetzner VM (`91.99.115.169`) met PM2 + systemd auto-start
 - Git push naar `main` → pull op VM → `pm2 restart virtual-pms`
 - Database: `data/pms.db` (WAL mode)
+
+## Locale ontwikkeling
+
+- **Project NIET in iCloud Drive** — native modules (better-sqlite3) falen door sync-timeouts
+- Werk vanuit `~/Projects/Virtual-PMS` (gekopieerd uit iCloud)
+- **Gebruik Node 22** (`/opt/homebrew/opt/node@22/bin/node`) — Node 26 heeft geen prebuilt `better-sqlite3`
+- Starten: `/opt/homebrew/opt/node@22/bin/node ~/Projects/Virtual-PMS/server.js`
+- Dashboard op `http://localhost:3000/admin/` (admin/admin)

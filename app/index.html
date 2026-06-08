@@ -20,6 +20,7 @@
     let apiKey = "";
     let customerId = null;
     let deviceId = "";
+    let tvSerialNumber = "";
 
     function log(msg) {
       var el = document.getElementById("applist");
@@ -48,6 +49,25 @@
       }
     }
 
+    function getSerialNumber(callback) {
+      var stored = null;
+      try { stored = localStorage.getItem("vps_serial"); } catch(e) {}
+      if (stored) { callback(stored); return; }
+      try {
+        idcap.request("idcap://system/info/get", {
+          parameters: {},
+          onSuccess: function(o) {
+            var s = o.serialNo || o.serialNumber || "";
+            if (s) {
+              try { localStorage.setItem("vps_serial", s); } catch(e) {}
+            }
+            callback(s);
+          },
+          onFailure: function() { callback(""); }
+        });
+      } catch(e) { callback(""); }
+    }
+
     function registerTv() {
       return fetch("/api/checkout/register", {
         method: "POST",
@@ -55,7 +75,8 @@
         body: JSON.stringify({
           api_key: apiKey,
           device_id: deviceId,
-          label: deviceId
+          serial_number: tvSerialNumber,
+          label: tvSerialNumber || deviceId
         })
       }).then(function(r) { return r.json(); });
     }
@@ -209,14 +230,18 @@
 
       validateApiKey().then(function(valid) {
         if (!valid) return;
-        registerTv().then(function(r) {
-          getTvInfo();
-          if (debugOption === "on") {
-            document.body.style.display = "block";
-          }
-          checkout_schedule();
-        }).catch(function() {
-          log("FOUT: Registratie mislukt");
+        getSerialNumber(function(serial) {
+          tvSerialNumber = serial;
+          if (serial) log("Serienummer: " + serial);
+          registerTv().then(function(r) {
+            getTvInfo();
+            if (debugOption === "on") {
+              document.body.style.display = "block";
+            }
+            checkout_schedule();
+          }).catch(function() {
+            log("FOUT: Registratie mislukt");
+          });
         });
       }).catch(function() {
         log("FOUT: Validatie mislukt");

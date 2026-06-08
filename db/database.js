@@ -26,7 +26,7 @@ function initTables() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
     );
 
     CREATE TABLE IF NOT EXISTS customers (
@@ -36,7 +36,7 @@ function initTables() {
       api_key TEXT UNIQUE NOT NULL,
       tv_limit INTEGER NOT NULL DEFAULT 1,
       active INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
     );
 
     CREATE TABLE IF NOT EXISTS tvs (
@@ -47,7 +47,7 @@ function initTables() {
       room_name TEXT,
       last_checkout TEXT,
       last_checkout_ok INTEGER,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
     );
 
     CREATE TABLE IF NOT EXISTS checkout_logs (
@@ -59,7 +59,7 @@ function initTables() {
       user_agent TEXT,
       success INTEGER NOT NULL DEFAULT 0,
       error_message TEXT,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
     );
   `);
 
@@ -71,6 +71,11 @@ function initTables() {
   // Migration: add ip_address column
   try {
     db.exec(`ALTER TABLE tvs ADD COLUMN ip_address TEXT`);
+  } catch(e) {}
+
+  // Migration: add serial_number column
+  try {
+    db.exec(`ALTER TABLE tvs ADD COLUMN serial_number TEXT`);
   } catch(e) {}
 
   const count = db.prepare('SELECT COUNT(*) as c FROM users').get();

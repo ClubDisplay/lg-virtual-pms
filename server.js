@@ -193,15 +193,21 @@ app.get('/api/stats', requireAuth, (req, res) => {
 // === TV Auto-registration (called by iframe) ===
 
 app.post('/api/checkout/register', (req, res) => {
-  const { api_key, device_id, label } = req.body;
+  const { api_key, device_id, serial_number, label } = req.body;
   if (!api_key || !device_id) return res.status(400).json({ error: 'api_key en device_id zijn verplicht' });
 
   const customer = db.prepare('SELECT id FROM customers WHERE api_key = ? AND active = 1').get(api_key);
   if (!customer) return res.status(404).json({ error: 'Ongeldige of gedeactiveerde API key' });
 
   // Check if TV already registered
-  let tv = db.prepare('SELECT id, label FROM tvs WHERE customer_id = ? AND device_id = ?').get(customer.id, device_id);
-  if (tv) return res.json({ id: tv.id, label: tv.label, registered: false });
+  let tv = db.prepare('SELECT id, label, serial_number FROM tvs WHERE customer_id = ? AND device_id = ?').get(customer.id, device_id);
+  if (tv) {
+    // Update serial_number if we have one and it wasn't set before
+    if (serial_number && !tv.serial_number) {
+      db.prepare('UPDATE tvs SET serial_number = ? WHERE id = ?').run(serial_number, tv.id);
+    }
+    return res.json({ id: tv.id, label: tv.label, registered: false });
+  }
 
   // Check tv_limit
   const tvCount = db.prepare('SELECT COUNT(*) as c FROM tvs WHERE customer_id = ?').get(customer.id).c;
@@ -211,8 +217,8 @@ app.post('/api/checkout/register', (req, res) => {
   // Auto-register this TV
   const ip = req.headers['x-forwarded-for'] || req.ip;
   const result = db.prepare(
-    'INSERT INTO tvs (customer_id, device_id, label, ip_address) VALUES (?, ?, ?, ?)'
-  ).run(customer.id, device_id, label || device_id, ip);
+    'INSERT INTO tvs (customer_id, device_id, serial_number, label, ip_address) VALUES (?, ?, ?, ?, ?)'
+  ).run(customer.id, device_id, serial_number || null, label || device_id, ip);
 
   res.json({ id: result.lastInsertRowid, label: label || device_id, registered: true });
 });
@@ -297,9 +303,9 @@ app.post('/api/checkout/log', (req, res) => {
   `).run(customer.id, tvId, api_key, ip_address || null, user_agent || null, success ? 1 : 0, error_message || null);
 
   if (tvId && success) {
-    db.prepare('UPDATE tvs SET last_checkout = datetime("now"), last_checkout_ok = 1 WHERE id = ?').run(tvId);
-  } else if (tvId) {
-    db.prepare('UPDATE tvs SET last_checkout = datetime("now"), last_checkout_ok = 0 WHERE id = ?').run(tvId);
+db.prepare('UPDATE tvs SET last_checkout = datetime("now", "localtime"), last_checkout_ok = 1 WHERE id = ?').run(tvId);
+    } else if (tvId) {
+    db.prepare('UPDATE tvs SET last_checkout = datetime("now", "localtime"), last_checkout_ok = 0 WHERE id = ?').run(tvId);
   }
 
   res.json({ success: true });
