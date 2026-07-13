@@ -29,7 +29,16 @@ LG webOS auto-checkout systeem met beheerdashboard.
 3. Valideert `?key=` via `/api/checkout/validate`
 4. Registreert TV via `/api/checkout/register`
 5. Plan checkout op `?hour=&min=` (default 11:00)
-6. Om checkout-tijd: `destroyAllApplications()` via IDCAP, dan `idcap://tv/checkout/request`
+6. Om checkout-tijd: `idcap://tv/checkout/request` (gast-sessies wissen, apps blijven intact)
+
+## PCC widget
+
+- **Altijd `<iframe>` gebruiken** — `<object>` en `<script>` tags werken niet op alle LG TV modellen
+- **Geen apps vernietigen** bij checkout — `idcap://tv/checkout/request` wist alleen gast-sessies, alle apps (Netflix, YouTube, KPN, NexoTV etc.) blijven intact
+- Widget code voorbeeld:
+  ```html
+  <iframe src="https://pms.clubdisplay.nl/?key=APIKEY&hour=11&min=0" sandbox="allow-scripts allow-same-origin" style="width:100%;height:100%;border:none"></iframe>
+  ```
 
 ## Belangrijke nuances
 
