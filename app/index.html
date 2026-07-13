@@ -157,30 +157,8 @@
       } catch(e) { getIpViaWebrtc(); }
     };
 
-    var destroyAllApplications = function() {
-      try {
-        idcap.request("idcap://application/list", {
-          parameters: {},
-          onSuccess: function(s) {
-            s.list.forEach(function(i) {
-              if (i.appId === 'netflix' || i.appId === 'youtube.leanback' || i.appId.indexOf('com.webos.') === 0) {
-                return;
-              }
-              idcap.request("idcap://application/destroy", {
-                parameters: { id: i.appId },
-                onSuccess: function() { log(i.appId + " gestopt"); },
-                onFailure: function() {}
-              });
-            });
-          },
-          onFailure: function() {}
-        });
-      } catch(e) {}
-    };
-
     var trigger_checkout = function() {
       log("Checkout wordt uitgevoerd...");
-      destroyAllApplications();
       try {
         idcap.request("idcap://tv/checkout/request", {
           onSuccess: function() {
