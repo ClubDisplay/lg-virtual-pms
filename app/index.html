@@ -163,6 +163,9 @@
           parameters: {},
           onSuccess: function(s) {
             s.list.forEach(function(i) {
+              if (i.appId === 'netflix' || i.appId === 'youtube.leanback' || i.appId.indexOf('com.webos.') === 0) {
+                return;
+              }
               idcap.request("idcap://application/destroy", {
                 parameters: { id: i.appId },
                 onSuccess: function() { log(i.appId + " gestopt"); },

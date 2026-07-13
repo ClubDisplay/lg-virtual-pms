@@ -180,7 +180,7 @@ function renderCustomer(app) {
             <h1>${escapeHtml(customer.name)}</h1>
             <div>
               <button class="btn btn-ghost" onclick="regenerateKey(${customer.id})">Nieuwe API key</button>
-              <button class="btn btn-ghost" onclick="toggleCustomerStatus(${customer.id})">${customer.active ? 'Deactiveer' : 'Activeer'}</button>
+              <button class="btn btn-ghost" onclick="toggleCustomerStatus(${customer.id}, ${customer.active})">${customer.active ? 'Deactiveer' : 'Activeer'}</button>
             </div>
           </div>
 
@@ -341,10 +341,10 @@ window.copyKey = function() {
   }
 };
 
-window.toggleCustomerStatus = async function(id) {
+window.toggleCustomerStatus = async function(id, currentActive) {
   await api('/customers/' + id, {
     method: 'PUT',
-    body: JSON.stringify({ active: false })  // simplified: we hard-toggle
+    body: JSON.stringify({ active: !currentActive })
   });
   navigate('customer/' + id);
 };
