@@ -199,12 +199,7 @@ function renderCustomer(app) {
 
           <div class="stat-card" style="grid-column:1/-1">
             <div class="label">Widget code — plak dit in PCC tekst widget (HTML modus)</div>
-            <div class="api-key"><span id="widgetCode" style="font-size:12px;white-space:pre-wrap;word-break:break-all">&lt;object 
-  data="https://pms.clubdisplay.nl/?key=${customer.api_key}&amp;hour=11&amp;min=0" 
-  type="text/html" 
-  width="100%" 
-  height="100%"&gt;
-&lt;/object&gt;</span>
+            <div class="api-key"><span id="widgetCode" style="font-size:12px;white-space:pre-wrap;word-break:break-all">&lt;script src="https://pms.clubdisplay.nl/embed.js?key=${customer.api_key}&amp;hour=11&amp;min=0"&gt;&lt;/script&gt;</span>
               <button onclick="copyWidget()">Kopieer code</button>
             </div>
           </div>
