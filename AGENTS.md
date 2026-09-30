@@ -60,6 +60,7 @@ pm2 start ecosystem.config.cjs  # Productie met PM2
 - Draait op Hetzner VM (`91.99.115.169`) met PM2 + systemd auto-start
 - Git push naar `main` → pull op VM → `pm2 restart virtual-pms`
 - Database: `data/pms.db` (WAL mode)
+- **Tijdzone server = `Europe/Amsterdam`** — de code gebruikt overal `datetime('now','localtime')`. Staat de VM op UTC, dan wijken alle tijden 1-2 uur af. Instellen: `timedatectl set-timezone Europe/Amsterdam` + `pm2 restart virtual-pms`.
 
 ## SSL / certificaten
 

@@ -184,7 +184,12 @@
       if (ms < 0) ms += 86400000;
       log("Checkout om " + String(hour).padStart(2, '0') + ":" + String(min).padStart(2, '0'));
       log("Over " + Math.round(ms / 60000) + " minuten");
-      setTimeout(trigger_checkout, ms);
+      // Na elke checkout opnieuw plannen voor de volgende dag, zodat een TV die
+      // lang aan blijft staan (zonder de pagina te herladen) dagelijks uitcheckt.
+      setTimeout(function() {
+        trigger_checkout();
+        checkout_schedule();
+      }, ms);
     }
 
     function init() {
