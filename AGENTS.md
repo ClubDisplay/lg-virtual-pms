@@ -61,6 +61,16 @@ pm2 start ecosystem.config.cjs  # Productie met PM2
 - Git push naar `main` → pull op VM → `pm2 restart virtual-pms`
 - Database: `data/pms.db` (WAL mode)
 
+## SSL / certificaten
+
+- **Let's Encrypt via certbot (snap)**, domein `pms.clubdisplay.nl`, ECDSA.
+- `server.js` leest het certificaat bij **opstarten** uit `/etc/letsencrypt/live/${DOMAIN}/` en draait zelf HTTP (80) én HTTPS (443). Er is géén nginx.
+- Renewal gebruikt **webroot** (niet standalone!): de app serveert `/.well-known/acme-challenge` vanaf `/var/www/certbot`. Reden: poort 80 is door de app zelf in gebruik, dus de standalone-plugin faalde met `Address already in use` en het cert verliep.
+- Na renewal herstart `renew_hook` (`/usr/local/bin/pms-cert-reload.sh`) automatisch PM2, zodat het nieuwe cert wordt ingelezen. Log: `/var/log/pms-cert-reload.log`.
+- Handmatig testen: `certbot renew --dry-run` en `certbot certificates`.
+- Extra (sub)domein toevoegen: `certbot certonly --webroot -w /var/www/certbot -d pms.clubdisplay.nl -d nieuw.domein.nl`.
+- **Geen `X-Frame-Options`/CSP zetten** op de checkout-pagina — die moet in een iframe op de PCC-portal kunnen laden.
+
 ## Locale ontwikkeling
 
 - **Project NIET in iCloud Drive** — native modules (better-sqlite3) falen door sync-timeouts
