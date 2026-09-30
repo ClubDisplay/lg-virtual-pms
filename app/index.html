@@ -177,6 +177,12 @@
       }
     };
 
+    var lastCheckoutDay = "";
+
+    function localDay(d) {
+      return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+    }
+
     function checkout_schedule() {
       var now = new Date();
       var target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, min, 0);
@@ -186,8 +192,14 @@
       log("Over " + Math.round(ms / 60000) + " minuten");
       // Na elke checkout opnieuw plannen voor de volgende dag, zodat een TV die
       // lang aan blijft staan (zonder de pagina te herladen) dagelijks uitcheckt.
+      // De dag-check voorkomt een dubbele checkout als de timer net vóór de
+      // geplande tijd afgaat.
       setTimeout(function() {
-        trigger_checkout();
+        var day = localDay(new Date());
+        if (day !== lastCheckoutDay) {
+          lastCheckoutDay = day;
+          trigger_checkout();
+        }
         checkout_schedule();
       }, ms);
     }
