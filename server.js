@@ -303,9 +303,9 @@ app.post('/api/checkout/log', (req, res) => {
   `).run(customer.id, tvId, api_key, ip_address || null, user_agent || null, success ? 1 : 0, error_message || null);
 
   if (tvId && success) {
-db.prepare('UPDATE tvs SET last_checkout = datetime("now", "localtime"), last_checkout_ok = 1 WHERE id = ?').run(tvId);
-    } else if (tvId) {
-    db.prepare('UPDATE tvs SET last_checkout = datetime("now", "localtime"), last_checkout_ok = 0 WHERE id = ?').run(tvId);
+    db.prepare("UPDATE tvs SET last_checkout = datetime('now', 'localtime'), last_checkout_ok = 1 WHERE id = ?").run(tvId);
+  } else if (tvId) {
+    db.prepare("UPDATE tvs SET last_checkout = datetime('now', 'localtime'), last_checkout_ok = 0 WHERE id = ?").run(tvId);
   }
 
   res.json({ success: true });
