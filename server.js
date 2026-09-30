@@ -311,6 +311,12 @@ db.prepare('UPDATE tvs SET last_checkout = datetime("now", "localtime"), last_ch
   res.json({ success: true });
 });
 
+// === ACME / Let's Encrypt webroot ===
+// Certbot schrijft hier de HTTP-01 challenge-bestanden. Zo kan het certificaat
+// vernieuwd worden zonder poort 80 te binden (die is door deze app in gebruik).
+const ACME_WEBROOT = process.env.ACME_WEBROOT || '/var/www/certbot';
+app.use('/.well-known', express.static(path.join(ACME_WEBROOT, '.well-known')));
+
 // === Dashboard frontend ===
 
 app.use('/admin', express.static(path.join(__dirname, 'app', 'dashboard')));
