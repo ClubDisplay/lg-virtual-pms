@@ -30,6 +30,7 @@ LG webOS auto-checkout systeem met beheerdashboard.
 4. Registreert TV via `/api/checkout/register`
 5. Plan checkout op `?hour=&min=` (default 11:00)
 6. Om checkout-tijd: `idcap://tv/checkout/request` (gast-sessies wissen, apps blijven intact)
+7. **Dagelijks herhalend:** na elke checkout plant de pagina automatisch opnieuw voor de volgende dag (ook zonder paginareload). Een `lastCheckoutDay`-guard voorkomt een dubbele checkout op dezelfde dag. Een TV die aan blijft staan checkt dus elke dag uit.
 
 ## PCC widget
 
@@ -39,6 +40,7 @@ LG webOS auto-checkout systeem met beheerdashboard.
   ```html
   <iframe src="https://pms.clubdisplay.nl/?key=APIKEY&hour=11&min=0" sandbox="allow-scripts allow-same-origin" style="width:100%;height:100%;border:none"></iframe>
   ```
+- **Het grijze "This content is blocked. Contact the site owner to fix the issue."-vlak in de Pro:Centric Cloud *editor-preview* is normaal en geen fout.** De editor serveert een CSP **zonder `frame-src`** (valt terug op `default-src 'self' *.lgbusinesscloud.com *.amazonaws.com ...`), dus externe iframes worden in de preview geblokkeerd. Bewezen met headless Chrome: *"Framing 'https://pms.clubdisplay.nl/' violates the following Content Security Policy directive ... 'frame-src' was not explicitly set, so 'default-src' is used as a fallback."* Dit raakt **alleen de preview in de editor**; op de echte TV laadt de iframe wél (bewijs: TV's registreren zich via `/api/checkout/register` en checken uit). Negeer het grijze vlak; test op een echte TV of open de URL direct.
 
 ## Belangrijke nuances
 
@@ -47,6 +49,8 @@ LG webOS auto-checkout systeem met beheerdashboard.
 - **IDCAP SDK** werkt alleen op LG webOS TV; op desktop browser gooit het errors (worden gevangen)
 - **Body checkout pagina** staat `display:none` in CSS; alleen zichtbaar met `?debug=on`
 - **API key per klant** — uniek, resetbaar via dashboard; zonder geldige key werkt checkout niet
+- **SQLite + better-sqlite3: gebruik ENKELE quotes** voor string-literals (`datetime('now','localtime')`). Dubbele quotes (`datetime("now","localtime")`) worden als kolomnamen gezien → `no such column: now` en de query faalt stil. Dit was de oorzaak van de `last_checkout`-bug (zie Geschiedenis).
+- **Checkouts zijn afhankelijk van TV-activiteit** — een TV die uit staat of niet op de checkout-pagina staat, checkt niet uit. Het aantal checkouts per dag is dus lager dan het aantal gekoppelde TV's; over een week checken alle actieve TV's minstens één keer uit.
 
 ## Commando's
 
@@ -79,3 +83,19 @@ pm2 start ecosystem.config.cjs  # Productie met PM2
 - **Gebruik Node 22** (`/opt/homebrew/opt/node@22/bin/node`) — Node 26 heeft geen prebuilt `better-sqlite3`
 - Starten: `/opt/homebrew/opt/node@22/bin/node ~/Projects/Virtual-PMS/server.js`
 - Dashboard op `http://localhost:3000/admin/` (admin/admin)
+
+## Geschiedenis / opgeloste issues
+
+### 2026-09-30
+
+1. **SSL-certificaat verlopen** (iframe toonde *"This content is blocked"*). Oorzaak: certbot gebruikte de `standalone`-plugin en wilde poort 80 binden, maar de app draait zelf op poort 80 → renewal faalde elke 6 uur met `Address already in use` → cert verliep op 31 aug. **Fix:** renewal omgezet naar **webroot** (`/.well-known` geserveerd vanaf `/var/www/certbot`) + `renew_hook` die PM2 herstart. Zie *SSL / certificaten*.
+2. **`last_checkout` werd nooit opgeslagen.** Oorzaak: `datetime("now","localtime")` met dubbele quotes in `server.js` → `no such column: now`. De checkout-log werd wél geschreven, maar de TV-status-update faalde bij élke checkout. **Fix:** enkele quotes. Historische `last_checkout` uit `checkout_logs` teruggezet (56/71 TV's).
+3. **Tijdzone.** Server stond op UTC terwijl de code `datetime('now','localtime')` gebruikt → alle tijden 1-2 uur te vroeg (checkout 09:00 i.p.v. 11:00). **Fix:** VM op `Europe/Amsterdam` + bestaande timestamps +2 uur gemigreerd (backup in `data/backups/`, marker in tabel `_migrations`).
+4. **Checkout nu dagelijks herhalend** i.p.v. eenmalig per paginareload (met dubbel-checkout-guard). Zie *Checkout flow* stap 7.
+5. **Pro:Centric editor-CSP** onderzocht → grijze vlak is alleen de editor-preview, TV's werken. Zie *PCC widget*.
+
+### Aandachtspunten voor later
+
+- De **laatste 8 TV's van Magnifigue X** (van 19) waren nog niet geregistreerd toen ze werden geïnstalleerd; ze registreren zich zodra ze de portal-pagina laden (uit/aan). `tv_limit` = 19, dus er is ruimte.
+- 4 oudere TV's (2× Anna House, 2× De Smulpot, waarvan 1 test-TV `tv-test-manual`) hebben **nooit** uitgecheckt — even controleren of die nog actief zijn.
+- Bij een **nieuw (sub)domein** voor de checkout: voeg het toe aan het certbot-certificaat én check dat het niet in de Pro:Centric-CSP hoeft (alleen editor-preview).
