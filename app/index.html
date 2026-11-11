@@ -226,27 +226,86 @@
     // Na een succesvolle checkout (dagelijks of handmatig) de TV herstarten.
     // Nodig voor installaties waar de TV/STB 24/7 aanstaat: apps zoals Netflix
     // lezen hun (gewiste) sessie pas opnieuw bij een herstart, waardoor een
-    // checkout zónder herstart geen zichtbaar effect heeft. Opt-in via &reboot=on.
+    // checkout zónder herstart geen zichtbaar effect heeft.
     var rebootScheduled = false;
+
+    function reportReboot(step, result) {
+      try {
+        fetch("/api/checkout/reboot-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ api_key: apiKey, device_id: deviceId, step: step, result: result || null })
+        }).catch(function() {});
+      } catch(e) {}
+    }
+
+    function powerOffOn() {
+      try {
+        idcap.request("idcap://tv/power/off", {
+          parameters: {},
+          onSuccess: function() {
+            log("TV uit (power/off), over 5s weer aan");
+            reportReboot("tv/power/off", { status: "accepted" });
+            setTimeout(function() {
+              try {
+                idcap.request("idcap://tv/power/on", {
+                  parameters: {},
+                  onSuccess: function() { log("TV aan (power/on)"); reportReboot("tv/power/on", { status: "accepted" }); },
+                  onFailure: function(f) { log("power/on mislukt: " + (f && f.errorMessage || "onbekend")); reportReboot("tv/power/on", { status: "failed", error: f && f.errorMessage }); rebootScheduled = false; }
+                });
+              } catch(e) {
+                log("power/on niet beschikbaar");
+                reportReboot("tv/power/on", { status: "exception", error: e && e.message });
+                rebootScheduled = false;
+              }
+            }, 5000);
+          },
+          onFailure: function(f) {
+            log("power/off mislukt: " + (f && f.errorMessage || "onbekend"));
+            reportReboot("tv/power/off", { status: "failed", error: f && f.errorMessage });
+            rebootScheduled = false;
+          }
+        });
+      } catch(e) {
+        log("power/off niet beschikbaar");
+        reportReboot("tv/power/off", { status: "exception", error: e && e.message });
+        rebootScheduled = false;
+      }
+    }
+
+    function tryReboot() {
+      try {
+        idcap.request("idcap://system/reboot", {
+          parameters: {},
+          onSuccess: function() {
+            log("system/reboot geaccepteerd");
+            reportReboot("system/reboot", { status: "accepted" });
+            // Als de TV over 8s nog steeds draait, is de reboot niet doorgegaan → fallback
+            setTimeout(function() {
+              reportReboot("system/reboot", { status: "nog-actief", note: "reboot niet doorgegaan" });
+              powerOffOn();
+            }, 8000);
+          },
+          onFailure: function(f) {
+            var msg = f && (f.errorMessage || JSON.stringify(f)) || "onbekend";
+            log("system/reboot mislukt: " + msg + " → fallback power off/on");
+            reportReboot("system/reboot", { status: "failed", error: msg });
+            powerOffOn();
+          }
+        });
+      } catch(e) {
+        log("system/reboot niet beschikbaar → fallback power off/on");
+        reportReboot("system/reboot", { status: "exception", error: e && e.message });
+        powerOffOn();
+      }
+    }
+
     function maybeReboot() {
       if (!rebootAfterCheckout || rebootScheduled) return;
       rebootScheduled = true;
       log("TV wordt herstart om apps (Netflix e.a.) uit te loggen...");
-      setTimeout(function() {
-        try {
-          idcap.request("idcap://system/reboot", {
-            parameters: {},
-            onSuccess: function() { log("Reboot commando geaccepteerd"); },
-            onFailure: function(f) {
-              log("Reboot mislukt: " + (f && f.errorMessage || "onbekend"));
-              rebootScheduled = false;
-            }
-          });
-        } catch(e) {
-          log("Reboot commando niet beschikbaar: " + (e && e.message ? e.message : "onbekend"));
-          rebootScheduled = false;
-        }
-      }, 1500);
+      reportReboot("start", {});
+      setTimeout(tryReboot, 1500);
     }
 
     // === Handmatig wissen via dashboard ===

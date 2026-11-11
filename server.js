@@ -500,6 +500,14 @@ app.post('/api/checkout/wipe/complete', (req, res) => {
   res.json({ success: true });
 });
 
+// Diagnostiek: TV meldt status van reboot/herstart-commando's
+app.post('/api/checkout/reboot-status', (req, res) => {
+  const { api_key, device_id, step, result } = req.body;
+  const customer = api_key ? db.prepare('SELECT id FROM customers WHERE api_key = ?').get(api_key) : null;
+  console.log(`🔄 REBOOT — customer:${customer ? customer.id : '?'} device:${device_id || '?'} step:${step || '?'} result:${typeof result === 'string' ? result : JSON.stringify(result || {})}`);
+  res.json({ ok: true });
+});
+
 // === ACME / Let's Encrypt webroot ===
 // Certbot schrijft hier de HTTP-01 challenge-bestanden. Zo kan het certificaat
 // vernieuwd worden zonder poort 80 te binden (die is door deze app in gebruik).
