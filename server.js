@@ -127,10 +127,10 @@ app.post('/api/customers', requireAdmin, (req, res) => {
 });
 
 app.put('/api/customers/:id', requireAdmin, (req, res) => {
-  const { name, contact_email, tv_limit, active } = req.body;
+  const { name, contact_email, tv_limit, active, daily_checkout, checkout_reboot } = req.body;
   db.prepare(
-    'UPDATE customers SET name = COALESCE(?, name), contact_email = COALESCE(?, contact_email), tv_limit = COALESCE(?, tv_limit), active = COALESCE(?, active) WHERE id = ?'
-  ).run(name || null, contact_email ?? null, tv_limit ?? null, active ?? null, req.params.id);
+    'UPDATE customers SET name = COALESCE(?, name), contact_email = COALESCE(?, contact_email), tv_limit = COALESCE(?, tv_limit), active = COALESCE(?, active), daily_checkout = COALESCE(?, daily_checkout), checkout_reboot = COALESCE(?, checkout_reboot) WHERE id = ?'
+  ).run(name || null, contact_email ?? null, tv_limit ?? null, active ?? null, daily_checkout ?? null, checkout_reboot ?? null, req.params.id);
   res.json({ success: true });
 });
 
@@ -360,10 +360,16 @@ app.get('/embed.js', (req, res) => {
 app.get('/api/checkout/validate', (req, res) => {
   const { key } = req.query;
   if (!key) return res.status(400).json({ valid: false, error: 'API key is verplicht' });
-  const customer = db.prepare('SELECT id, name, tv_limit, active FROM customers WHERE api_key = ?').get(key);
+  const customer = db.prepare('SELECT id, name, tv_limit, active, daily_checkout, checkout_reboot FROM customers WHERE api_key = ?').get(key);
   if (!customer) return res.status(404).json({ valid: false, error: 'Ongeldige API key' });
   if (!customer.active) return res.status(403).json({ valid: false, error: 'Account is gedeactiveerd' });
-  res.json({ valid: true, customer_id: customer.id, customer_name: customer.name });
+  res.json({
+    valid: true,
+    customer_id: customer.id,
+    customer_name: customer.name,
+    daily_checkout: customer.daily_checkout === 0 ? 0 : 1,
+    checkout_reboot: customer.checkout_reboot === 0 ? 0 : 1
+  });
 });
 
 function getCheckoutTime(req, res) {
@@ -390,23 +396,28 @@ function requireActiveCheckoutKey(req, res) {
   const key = req.query.key;
   if (!key) {
     res.status(400).json({ error: 'API key is verplicht' });
-    return false;
+    return null;
   }
-  const customer = db.prepare('SELECT id FROM customers WHERE api_key = ? AND active = 1').get(key);
+  const customer = db.prepare('SELECT id, daily_checkout FROM customers WHERE api_key = ? AND active = 1').get(key);
   if (!customer) {
     res.status(404).json({ error: 'Ongeldige of gedeactiveerde API key' });
-    return false;
+    return null;
   }
-  return true;
+  return customer;
 }
 
 app.get('/api/checkout/schedule', (req, res) => {
-  if (!requireActiveCheckoutKey(req, res)) return;
+  const customer = requireActiveCheckoutKey(req, res);
+  if (!customer) return;
+  if (!customer.daily_checkout) {
+    return res.json({ enabled: false });
+  }
   const checkoutTime = getCheckoutTime(req, res);
   if (!checkoutTime) return;
   const now = new Date();
   const target = getNextCheckoutTarget(checkoutTime.hour, checkoutTime.min, now);
   res.json({
+    enabled: true,
     server_now: now.toISOString(),
     server_day: getLocalDay(now),
     wait_ms: Math.max(1000, target.getTime() - now.getTime()),
@@ -416,7 +427,11 @@ app.get('/api/checkout/schedule', (req, res) => {
 });
 
 app.get('/api/checkout/authorize', (req, res) => {
-  if (!requireActiveCheckoutKey(req, res)) return;
+  const customer = requireActiveCheckoutKey(req, res);
+  if (!customer) return;
+  if (!customer.daily_checkout) {
+    return res.json({ allowed: false, enabled: false });
+  }
   const checkoutTime = getCheckoutTime(req, res);
   if (!checkoutTime) return;
   const now = new Date();

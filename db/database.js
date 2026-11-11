@@ -94,6 +94,14 @@ function initTables() {
     db.exec(`ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'`);
   } catch(e) {}
 
+  // Migration: per klant checkout-instellingen (default = huidige gedrag)
+  try {
+    db.exec(`ALTER TABLE customers ADD COLUMN daily_checkout INTEGER NOT NULL DEFAULT 1`);
+  } catch(e) {}
+  try {
+    db.exec(`ALTER TABLE customers ADD COLUMN checkout_reboot INTEGER NOT NULL DEFAULT 0`);
+  } catch(e) {}
+
   // Migration: per TV bijhouden tot welk handmatig wis-verzoek is uitgevoerd
   try {
     db.exec(`ALTER TABLE tvs ADD COLUMN last_wipe_command_id INTEGER NOT NULL DEFAULT 0`);

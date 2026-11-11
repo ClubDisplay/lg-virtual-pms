@@ -213,6 +213,21 @@ function renderCustomer(app) {
 
           ${isAdmin ? `
           <div class="stat-card" style="margin-bottom:24px">
+            <div class="label">Checkout instellingen</div>
+            <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+              <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer">
+                <input type="checkbox" ${customer.daily_checkout ? 'checked' : ''} onchange="setDailyCheckout(${customer.id}, this.checked)">
+                Dagelijkse automatische checkout (11:00)
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer">
+                <input type="checkbox" ${customer.checkout_reboot ? 'checked' : ''} onchange="setCheckoutReboot(${customer.id}, this.checked)">
+                TV herstarten na checkout
+              </label>
+            </div>
+            <div style="font-size:12px;color:#888;margin-top:8px">"TV herstarten" is alleen nodig bij 24/7 aanstaande TV's (bijv. bioscoop), zodat apps zoals Netflix daadwerkelijk uitloggen.</div>
+          </div>
+
+          <div class="stat-card" style="margin-bottom:24px">
             <div class="label">API Key</div>
             <div class="api-key"><span id="apiKeyValue">${customer.api_key}</span>
               <button onclick="copyKey()">Kopiëren</button>
@@ -418,6 +433,16 @@ window.showSetUser = function(customerId) {
       alert(res.data.error || 'Fout bij opslaan');
     }
   });
+};
+
+window.setDailyCheckout = async function(id, enabled) {
+  const res = await api('/customers/' + id, { method: 'PUT', body: JSON.stringify({ daily_checkout: enabled ? 1 : 0 }) });
+  if (!res.ok) alert(res.data.error || 'Fout bij opslaan');
+};
+
+window.setCheckoutReboot = async function(id, enabled) {
+  const res = await api('/customers/' + id, { method: 'PUT', body: JSON.stringify({ checkout_reboot: enabled ? 1 : 0 }) });
+  if (!res.ok) alert(res.data.error || 'Fout bij opslaan');
 };
 
 // === Logs ===
