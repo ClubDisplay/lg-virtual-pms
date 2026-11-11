@@ -410,7 +410,7 @@ app.get('/api/checkout/schedule', (req, res) => {
   const customer = requireActiveCheckoutKey(req, res);
   if (!customer) return;
   if (!customer.daily_checkout) {
-    return res.json({ enabled: false });
+    return res.json({ enabled: false, wait_ms: 3600000 });
   }
   const checkoutTime = getCheckoutTime(req, res);
   if (!checkoutTime) return;
@@ -430,7 +430,7 @@ app.get('/api/checkout/authorize', (req, res) => {
   const customer = requireActiveCheckoutKey(req, res);
   if (!customer) return;
   if (!customer.daily_checkout) {
-    return res.json({ allowed: false, enabled: false });
+    return res.json({ allowed: false, enabled: false, wait_ms: 3600000 });
   }
   const checkoutTime = getCheckoutTime(req, res);
   if (!checkoutTime) return;
