@@ -21,6 +21,7 @@
     let customerId = null;
     let deviceId = "";
     let tvSerialNumber = "";
+    let rebootAfterCheckout = false;
 
     function log(msg) {
       var el = document.getElementById("applist");
@@ -195,6 +196,7 @@
             log("Checkout geslaagd!");
             logCheckout(true, null);
             if (onDone) onDone(true);
+            maybeReboot();
           },
           onFailure: function(f) {
             var msg = f.errorMessage || "Onbekende fout";
@@ -213,6 +215,32 @@
     var trigger_checkout = function() {
       runCheckout(null);
     };
+
+    // Na een succesvolle checkout (dagelijks of handmatig) de TV herstarten.
+    // Nodig voor installaties waar de TV/STB 24/7 aanstaat: apps zoals Netflix
+    // lezen hun (gewiste) sessie pas opnieuw bij een herstart, waardoor een
+    // checkout zónder herstart geen zichtbaar effect heeft. Opt-in via &reboot=on.
+    var rebootScheduled = false;
+    function maybeReboot() {
+      if (!rebootAfterCheckout || rebootScheduled) return;
+      rebootScheduled = true;
+      log("TV wordt herstart om apps (Netflix e.a.) uit te loggen...");
+      setTimeout(function() {
+        try {
+          idcap.request("idcap://system/reboot", {
+            parameters: {},
+            onSuccess: function() { log("Reboot commando geaccepteerd"); },
+            onFailure: function(f) {
+              log("Reboot mislukt: " + (f && f.errorMessage || "onbekend"));
+              rebootScheduled = false;
+            }
+          });
+        } catch(e) {
+          log("Reboot commando niet beschikbaar: " + (e && e.message ? e.message : "onbekend"));
+          rebootScheduled = false;
+        }
+      }, 1500);
+    }
 
     // === Handmatig wissen via dashboard ===
     // De TV pollt periodiek of er een wis-verzoek klaarstaat; zo ja, direct uitvoeren.
@@ -298,6 +326,7 @@
       hour = isNaN(requestedHour) ? 11 : requestedHour;
       min = isNaN(requestedMin) ? 0 : requestedMin;
       debugOption = getQueryParam("debug") || "off";
+      rebootAfterCheckout = getQueryParam("reboot") === "on";
 
       if (!apiKey) {
         log("FOUT: Geen API key opgegeven");

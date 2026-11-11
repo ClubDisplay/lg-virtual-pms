@@ -51,6 +51,7 @@ LG webOS auto-checkout systeem met beheerdashboard.
   ```html
   <iframe src="https://pms.clubdisplay.nl/?key=APIKEY&hour=11&min=0" sandbox="allow-scripts allow-same-origin" style="width:100%;height:100%;border:none"></iframe>
   ```
+- **Installaties met 24/7-aanstaande TV/STB (bijv. bioscoop):** voeg `&reboot=on` toe aan de widget-URL. Na elke succesvolle checkout (dagelijks én handmatig) herstart de TV dan via `idcap://system/reboot`, zodat lopende apps (Netflix) hun gewiste sessie opnieuw lezen en wél uitloggen. Zonder herstart blijft een draaiende app ingelogd omdat die de sessie in het geheugen vasthoudt.
 - **Het grijze "This content is blocked. Contact the site owner to fix the issue."-vlak in de Pro:Centric Cloud *editor-preview* is normaal en geen fout.** De editor serveert een CSP **zonder `frame-src`** (valt terug op `default-src 'self' *.lgbusinesscloud.com *.amazonaws.com ...`), dus externe iframes worden in de preview geblokkeerd. Bewezen met headless Chrome: *"Framing 'https://pms.clubdisplay.nl/' violates the following Content Security Policy directive ... 'frame-src' was not explicitly set, so 'default-src' is used as a fallback."* Dit raakt **alleen de preview in de editor**; op de echte TV laadt de iframe wél (bewijs: TV's registreren zich via `/api/checkout/register` en checken uit). Negeer het grijze vlak; test op een echte TV of open de URL direct.
 - **De API-key in de widget moet de actuele key van dezelfde klant zijn.** Na het opnieuw genereren van een key moet de HTML-widget in PCC worden bijgewerkt en opnieuw gepubliceerd; een oude key geeft `404` en registreert geen TV.
 
@@ -102,10 +103,12 @@ pm2 start ecosystem.config.cjs  # Productie met PM2
 
 ## Geschiedenis / opgeloste issues
 
-### 2026-10-24
+### 2026-11-11
 
-1. **Handmatig wissen + klant-login toegevoegd** — per klant is er nu een knop "Wis handmatig" (per TV) en "Wis alle TV's handmatig". Dit zet een `wipe_commands`-rij klaar; de TV pollt `/api/checkout/wipe/pending` (~15s) en voert `idcap://tv/checkout/request` uit. De dagelijkse 11:00-checkout blijft default en ongewijzigd.
+1. **Handmatig wissen + klant-login toegevoegd** — per klant is er nu een knop "Wis login gast" (per TV) en "Wis alle login's gasten". Dit zet een `wipe_commands`-rij klaar; de TV pollt `/api/checkout/wipe/pending` (~15s) en voert `idcap://tv/checkout/request` uit. De dagelijkse 11:00-checkout blijft default en ongewijzigd.
 2. **Rollen** — `users` heeft `role` en `customer_id`. Admin kan per klant een dashboard-gebruiker aanmaken die alleen de eigen omgeving ziet (geen andere klanten, geen beheeracties). Zie *Rollen / klant-login*.
+3. **Error-handler malformed JSON** — scanners die form-data naar een JSON-endpoint sturen (bijv. `0x[]=DTAB`) veroorzaakten stacktrace-ruis in de error-log; nu netjes een schone `400` zonder stacktrace.
+4. **Optionele herstart na checkout (`&reboot=on`)** — `idcap://tv/checkout/request` wist de gast-data wel, maar een **lopende** app (Netflix) leest die gewiste data pas opnieuw bij een herstart. Voor installaties waar de TV/STB 24/7 aanstaat (bijv. bioscoop) kan de widget `&reboot=on` krijgen; na elke succesvolle checkout wordt dan `idcap://system/reboot` uitgevoerd. Default uit, dus hotels merken niets.
 
 ### 2026-10-19
 
