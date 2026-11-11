@@ -24,7 +24,7 @@
     let rebootAfterCheckout = false;
     let dailyCheckoutEnabled = true;
     // Moet overeenkomen met CHECKOUT_CODE_VERSION in server.js
-    var codeVersion = 4;
+    var codeVersion = 5;
 
     function log(msg) {
       var el = document.getElementById("applist");
@@ -202,8 +202,9 @@
       log("Checkout wordt uitgevoerd...");
       try {
         idcap.request("idcap://tv/checkout/request", {
-          onSuccess: function() {
+          onSuccess: function(o) {
             log("Checkout geslaagd!");
+            reportReboot("checkout/response", { status: "ok", data: JSON.stringify(o || {}).slice(0, 2000) });
             logCheckout(true, null);
             if (onDone) onDone(true);
             maybeReboot();
