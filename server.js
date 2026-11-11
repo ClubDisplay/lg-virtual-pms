@@ -26,6 +26,9 @@ if (fs.existsSync(envPath)) {
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DOMAIN = process.env.DOMAIN || 'pms.clubdisplay.nl';
+// Versie van de checkout-pagina (app/index.html). Bump beide (server én index.html)
+// samen zodat TV's zichzelf automatisch herladen bij een code-update.
+const CHECKOUT_CODE_VERSION = 2;
 
 app.use(express.json());
 
@@ -475,17 +478,17 @@ app.post('/api/checkout/log', (req, res) => {
 
 app.get('/api/checkout/wipe/pending', (req, res) => {
   const { key, device_id } = req.query;
-  if (!key || !device_id) return res.status(400).json({ pending: false });
+  if (!key || !device_id) return res.status(400).json({ pending: false, version: CHECKOUT_CODE_VERSION });
   const customer = db.prepare('SELECT id FROM customers WHERE api_key = ? AND active = 1').get(key);
-  if (!customer) return res.status(404).json({ pending: false });
+  if (!customer) return res.status(404).json({ pending: false, version: CHECKOUT_CODE_VERSION });
   const tv = db.prepare('SELECT id, last_wipe_command_id FROM tvs WHERE customer_id = ? AND device_id = ?').get(customer.id, device_id);
-  if (!tv) return res.json({ pending: false });
+  if (!tv) return res.json({ pending: false, version: CHECKOUT_CODE_VERSION });
   const cmd = db.prepare(`
     SELECT id FROM wipe_commands
     WHERE customer_id = ? AND (tv_id IS NULL OR tv_id = ?) AND id > COALESCE(?, 0)
     ORDER BY id DESC LIMIT 1
   `).get(customer.id, tv.id, tv.last_wipe_command_id);
-  res.json({ pending: !!cmd, command_id: cmd ? cmd.id : null });
+  res.json({ pending: !!cmd, command_id: cmd ? cmd.id : null, version: CHECKOUT_CODE_VERSION });
 });
 
 app.post('/api/checkout/wipe/complete', (req, res) => {

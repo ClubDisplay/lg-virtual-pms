@@ -23,6 +23,8 @@
     let tvSerialNumber = "";
     let rebootAfterCheckout = false;
     let dailyCheckoutEnabled = true;
+    // Moet overeenkomen met CHECKOUT_CODE_VERSION in server.js
+    var codeVersion = 2;
 
     function log(msg) {
       var el = document.getElementById("applist");
@@ -318,6 +320,12 @@
       fetch("/api/checkout/wipe/pending?key=" + encodeURIComponent(apiKey) + "&device_id=" + encodeURIComponent(deviceId))
         .then(function(r) { return r.json(); })
         .then(function(data) {
+          // Auto-reload als de server een nieuwere code-versie heeft
+          if (typeof data.version === 'number' && data.version !== codeVersion) {
+            log("Nieuwe code-versie (" + data.version + "), pagina wordt herladen...");
+            location.reload();
+            return;
+          }
           if (data && data.pending && data.command_id) {
             executeWipe(data.command_id);
           }
