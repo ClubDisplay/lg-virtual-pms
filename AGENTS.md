@@ -138,6 +138,7 @@ pm2 start ecosystem.config.cjs  # Productie met PM2
 
 ### Aandachtspunten voor later
 
+- **Bioscoop = klant "The Spareroom"** (sinds 2026-11-11): `daily_checkout=UIT`, `checkout_reboot=AAN` → alleen handmatig wissen + herstart na checkout. Na de code-update van 2026-11-11 moest de bioscoop-TV één keer herstarten (uit/aan) om de nieuwe pagina-code te laden; daarna werkt het automatisch.
 - De **laatste 8 TV's van Magnifigue X** (van 19) waren nog niet geregistreerd toen ze werden geïnstalleerd; ze registreren zich zodra ze de portal-pagina laden (uit/aan). `tv_limit` = 19, dus er is ruimte.
 - 4 oudere TV's (2× Anna House, 2× De Smulpot, waarvan 1 test-TV `tv-test-manual`) hebben **nooit** uitgecheckt — even controleren of die nog actief zijn.
 - Bij een **nieuw (sub)domein** voor de checkout: voeg het toe aan het certbot-certificaat én check dat het niet in de Pro:Centric-CSP hoeft (alleen editor-preview).
