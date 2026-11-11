@@ -309,7 +309,7 @@ app.post('/api/checkout/register', (req, res) => {
 
 // Track page load (for debugging)
 app.get('/api/track/load', (req, res) => {
-  console.log('📺 PAGE LOAD — origin:', req.headers.origin || '-', 'ip:', req.ip, 'xff:', req.headers['x-forwarded-for'] || '-', 'real:', req.headers['x-real-ip'] || '-', 'client:', req.headers['x-client-ip'] || '-', 'ua:', (req.headers['user-agent'] || '-').slice(0, 80));
+  console.log('📺 PAGE LOAD — v:', req.query.v || '-', 'origin:', req.headers.origin || '-', 'ip:', req.ip, 'xff:', req.headers['x-forwarded-for'] || '-', 'real:', req.headers['x-real-ip'] || '-', 'client:', req.headers['x-client-ip'] || '-', 'ua:', (req.headers['user-agent'] || '-').slice(0, 80));
   res.json({ ok: true });
 });
 
@@ -535,13 +535,14 @@ app.get('/admin/:page', (req, res) => {
 // laden ze gegarandeerd de nieuwste code.
 app.get('/', (req, res) => {
   if (String(req.query.v) === String(CHECKOUT_CODE_VERSION)) {
+    console.log('✅ SERVE v' + CHECKOUT_CODE_VERSION + ' — ua:', (req.headers['user-agent'] || '-').slice(0, 60));
     res.setHeader('Cache-Control', 'no-store');
     return res.sendFile(path.join(__dirname, 'app', 'index.html'));
   }
   console.log('↪ REDIRECT naar v' + CHECKOUT_CODE_VERSION + ' — url:', req.originalUrl);
   const params = new URLSearchParams(req.query);
   params.set('v', CHECKOUT_CODE_VERSION);
-  res.redirect(302, '/?' + params.toString());
+  res.redirect(302, 'https://' + req.get('host') + '/?' + params.toString());
 });
 
 app.use(express.static(path.join(__dirname, 'app'), {

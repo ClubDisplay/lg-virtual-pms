@@ -413,7 +413,7 @@
       deviceId = getDeviceId();
       log("Apparaat: " + deviceId);
 
-      fetch('/api/track/load?k=' + apiKey.slice(0, 8)).catch(function() {});
+      fetch('/api/track/load?k=' + apiKey.slice(0, 8) + '&v=' + codeVersion).catch(function() {});
 
       // Eerst controleren of fetch werkt
       if (typeof fetch === 'undefined') {
