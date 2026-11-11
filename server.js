@@ -28,7 +28,7 @@ const PORT = process.env.PORT || 3000;
 const DOMAIN = process.env.DOMAIN || 'pms.clubdisplay.nl';
 // Versie van de checkout-pagina (app/index.html). Bump beide (server én index.html)
 // samen zodat TV's zichzelf automatisch herladen bij een code-update.
-const CHECKOUT_CODE_VERSION = 3;
+const CHECKOUT_CODE_VERSION = 4;
 
 app.use(express.json());
 

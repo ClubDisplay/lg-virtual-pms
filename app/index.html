@@ -24,7 +24,7 @@
     let rebootAfterCheckout = false;
     let dailyCheckoutEnabled = true;
     // Moet overeenkomen met CHECKOUT_CODE_VERSION in server.js
-    var codeVersion = 3;
+    var codeVersion = 4;
 
     function log(msg) {
       var el = document.getElementById("applist");
@@ -114,6 +114,7 @@
           log("Automatische dagelijkse checkout is uitgeschakeld voor deze klant");
         }
         startWipePolling();
+        probeApps();
       }).catch(function(e) {
         log("FOUT: Registratie mislukt" + (e && e.message ? ": " + e.message : ""));
       });
@@ -239,6 +240,29 @@
           body: JSON.stringify({ api_key: apiKey, device_id: deviceId, step: step, result: result || null })
         }).catch(function() {});
       } catch(e) {}
+    }
+
+    // Diagnostiek: ontdek welke app-commando's de TV ondersteunt en welke apps
+    // (met appId) er geïnstalleerd zijn. Rapporteert naar de server.
+    function probeApps() {
+      try {
+        idcap.request("idcap://app/list/get", {
+          parameters: {},
+          onSuccess: function(o) {
+            var s = JSON.stringify(o);
+            log("App-lijst ontvangen (" + s.length + " chars)");
+            reportReboot("app/list/get", { status: "ok", data: s.slice(0, 3000) });
+          },
+          onFailure: function(f) {
+            var msg = f && (f.errorMessage || JSON.stringify(f)) || "onbekend";
+            log("app/list/get mislukt: " + msg);
+            reportReboot("app/list/get", { status: "failed", error: msg });
+          }
+        });
+      } catch(e) {
+        log("app/list/get niet beschikbaar: " + (e && e.message ? e.message : "onbekend"));
+        reportReboot("app/list/get", { status: "exception", error: e && e.message });
+      }
     }
 
     function powerOffOn() {
