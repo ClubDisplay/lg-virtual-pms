@@ -530,15 +530,25 @@ app.get('/admin/:page', (req, res) => {
 
 // === Checkout page ===
 
+// Cache-busting: redirect naar een versie-URL. Sommige TV-browsers negeren
+// Cache-Control: no-store en cachen de oude pagina; door de URL te wijzigen
+// laden ze gegarandeerd de nieuwste code.
+app.get('/', (req, res) => {
+  if (String(req.query.v) === String(CHECKOUT_CODE_VERSION)) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.sendFile(path.join(__dirname, 'app', 'index.html'));
+  }
+  console.log('↪ REDIRECT naar v' + CHECKOUT_CODE_VERSION + ' — url:', req.originalUrl);
+  const params = new URLSearchParams(req.query);
+  params.set('v', CHECKOUT_CODE_VERSION);
+  res.redirect(302, '/?' + params.toString());
+});
+
 app.use(express.static(path.join(__dirname, 'app'), {
   setHeaders: (res, filePath) => {
     if (path.basename(filePath) === 'index.html') res.setHeader('Cache-Control', 'no-store');
   }
 }));
-
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'app', 'index.html'));
-});
 
 // === Error handling ===
 // Vangt malformed JSON (bijv. scanners die form-data naar een JSON endpoint
