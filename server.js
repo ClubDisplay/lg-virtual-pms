@@ -514,6 +514,17 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'app', 'index.html'));
 });
 
+// === Error handling ===
+// Vangt malformed JSON (bijv. scanners die form-data naar een JSON endpoint
+// sturen) netjes af, zodat de error-log niet vervuilt met stacktraces.
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'Ongeldig verzoek (ongeldige JSON body)' });
+  }
+  console.error('Onverwachte fout:', err);
+  res.status(err.status || 500).json({ error: 'Serverfout' });
+});
+
 // HTTP -> HTTPS redirect en HTTP server
 app.listen(PORT, () => {
   console.log(`HTTP Server running at http://localhost:${PORT}`);
