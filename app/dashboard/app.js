@@ -196,7 +196,7 @@ function renderCustomer(app) {
           <div class="detail-header">
             <h1>${escapeHtml(customer.name)}</h1>
             <div>
-              <button class="btn btn-warning" onclick="wipeAll(${customer.id})">Wis alle TV's handmatig</button>
+              <button class="btn btn-warning" onclick="wipeAll(${customer.id})">Wis alle login's gasten</button>
               ${isAdmin ? `
               <button class="btn btn-ghost" onclick="regenerateKey(${customer.id})">Nieuwe API key</button>
               <button class="btn btn-ghost" onclick="toggleCustomerStatus(${customer.id}, ${customer.active})">${customer.active ? 'Deactiveer' : 'Activeer'}</button>
@@ -253,7 +253,7 @@ function renderCustomer(app) {
                   <td>${t.last_checkout ? new Date(t.last_checkout).toLocaleString('nl-NL') : '-'}</td>
                   <td>${t.pending_wipe ? '<span class="badge warn">Wis-verzoek</span>' : (t.last_checkout_ok === 1 ? '<span class="badge success">OK</span>' : t.last_checkout_ok === 0 ? '<span class="badge error">Mislukt</span>' : '-')}</td>
                   <td nowrap>
-                    <button class="btn btn-warning btn-sm" onclick="wipeTv(${customer.id}, ${t.id})">Wis handmatig</button>
+                    <button class="btn btn-warning btn-sm" onclick="wipeTv(${customer.id}, ${t.id})">Wis login gast</button>
                     ${isAdmin ? `
                     <button class="btn btn-ghost btn-sm" onclick="renameTv(${t.id}, '${escapeHtml(t.label)}')">Hernoem</button>
                     <button class="btn btn-danger btn-sm" onclick="deleteTv(${t.id})">Verwijder</button>
