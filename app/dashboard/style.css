@@ -47,6 +47,7 @@ tr:hover td { background: #fafafa; }
 .badge.inactive { background: #f8d7da; color: #721c24; }
 .badge.success { background: #d4edda; color: #155724; }
 .badge.error { background: #f8d7da; color: #721c24; }
+.badge.warn { background: #fff3cd; color: #856404; }
 
 /* Buttons */
 .btn { display: inline-block; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; border: none; cursor: pointer; text-decoration: none; }
@@ -57,6 +58,8 @@ tr:hover td { background: #fafafa; }
 .btn-sm { padding: 4px 10px; font-size: 12px; }
 .btn-ghost { background: transparent; color: #4361ee; border: 1px solid #4361ee; padding: 4px 10px; font-size: 12px; border-radius: 6px; cursor: pointer; }
 .btn-ghost:hover { background: #4361ee; color: #fff; }
+.btn-warning { background: #f77f00; color: #fff; }
+.btn-warning:hover { background: #d96b00; }
 
 /* Forms */
 .form-group { margin-bottom: 16px; }

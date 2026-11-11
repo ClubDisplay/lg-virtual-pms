@@ -53,6 +53,14 @@
       var stored = null;
       try { stored = localStorage.getItem("vps_serial"); } catch(e) {}
       if (stored) { callback(stored); return; }
+      var finished = false;
+      var timeoutId = setTimeout(function() { finish(""); }, 3000);
+      function finish(value) {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timeoutId);
+        callback(value || "");
+      }
       try {
         idcap.request("idcap://system/info/get", {
           parameters: {},
@@ -61,11 +69,11 @@
             if (s) {
               try { localStorage.setItem("vps_serial", s); } catch(e) {}
             }
-            callback(s);
+            finish(s);
           },
-          onFailure: function() { callback(""); }
+          onFailure: function() { finish(""); }
         });
-      } catch(e) { callback(""); }
+      } catch(e) { finish(""); }
     }
 
     function registerTv() {
@@ -78,7 +86,29 @@
           serial_number: tvSerialNumber,
           label: tvSerialNumber || deviceId
         })
-      }).then(function(r) { return r.json(); });
+      }).then(function(r) {
+        return r.json().then(function(data) {
+          if (!r.ok) throw new Error(data.error || "Registratie mislukt");
+          return data;
+        });
+      });
+    }
+
+    var registrationStarted = false;
+
+    function startRegistration() {
+      if (registrationStarted) return;
+      registrationStarted = true;
+      registerTv().then(function() {
+        getTvInfo();
+        if (debugOption === "on") {
+          document.body.style.display = "block";
+        }
+        checkout_schedule();
+        startWipePolling();
+      }).catch(function(e) {
+        log("FOUT: Registratie mislukt" + (e && e.message ? ": " + e.message : ""));
+      });
     }
 
     function validateApiKey() {
@@ -157,57 +187,116 @@
       } catch(e) { getIpViaWebrtc(); }
     };
 
-    var trigger_checkout = function() {
+    var runCheckout = function(onDone) {
       log("Checkout wordt uitgevoerd...");
       try {
         idcap.request("idcap://tv/checkout/request", {
           onSuccess: function() {
             log("Checkout geslaagd!");
             logCheckout(true, null);
+            if (onDone) onDone(true);
           },
           onFailure: function(f) {
             var msg = f.errorMessage || "Onbekende fout";
             log("Checkout mislukt: " + msg);
             logCheckout(false, msg);
+            if (onDone) onDone(false);
           }
         });
       } catch(e) {
         log("IDCAP niet beschikbaar (simulatie)");
         logCheckout(true, "simulatie");
+        if (onDone) onDone(true);
       }
     };
 
-    var lastCheckoutDay = "";
+    var trigger_checkout = function() {
+      runCheckout(null);
+    };
 
-    function localDay(d) {
-      return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+    // === Handmatig wissen via dashboard ===
+    // De TV pollt periodiek of er een wis-verzoek klaarstaat; zo ja, direct uitvoeren.
+    var wipeInProgress = false;
+    var wipePollTimer = null;
+
+    function checkPendingWipe() {
+      if (!apiKey || !deviceId || wipeInProgress) return;
+      fetch("/api/checkout/wipe/pending?key=" + encodeURIComponent(apiKey) + "&device_id=" + encodeURIComponent(deviceId))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data && data.pending && data.command_id) {
+            executeWipe(data.command_id);
+          }
+        })
+        .catch(function() {});
     }
 
+    function executeWipe(commandId) {
+      wipeInProgress = true;
+      log("Handmatig wis-verzoek ontvangen van dashboard...");
+      runCheckout(function() {
+        fetch("/api/checkout/wipe/complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ api_key: apiKey, device_id: deviceId, command_id: commandId })
+        }).then(function() {
+          wipeInProgress = false;
+        }).catch(function() {
+          wipeInProgress = false;
+        });
+      });
+    }
+
+    function startWipePolling() {
+      if (wipePollTimer) return;
+      checkPendingWipe();
+      wipePollTimer = setInterval(checkPendingWipe, 15000);
+    }
+
+    var lastCheckoutDay = "";
+    var scheduleTimer = null;
+
     function checkout_schedule() {
-      var now = new Date();
-      var target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, min, 0);
-      var ms = target - now;
-      if (ms < 0) ms += 86400000;
-      log("Checkout om " + String(hour).padStart(2, '0') + ":" + String(min).padStart(2, '0'));
-      log("Over " + Math.round(ms / 60000) + " minuten");
-      // Na elke checkout opnieuw plannen voor de volgende dag, zodat een TV die
-      // lang aan blijft staan (zonder de pagina te herladen) dagelijks uitcheckt.
-      // De dag-check voorkomt een dubbele checkout als de timer net vóór de
-      // geplande tijd afgaat.
-      setTimeout(function() {
-        var day = localDay(new Date());
-        if (day !== lastCheckoutDay) {
-          lastCheckoutDay = day;
-          trigger_checkout();
-        }
-        checkout_schedule();
-      }, ms);
+      fetch("/api/checkout/schedule?key=" + encodeURIComponent(apiKey) + "&hour=" + hour + "&min=" + min)
+        .then(function(r) { return r.json().then(function(data) { if (!r.ok) throw new Error(data.error || "Planning mislukt"); return data; }); })
+        .then(function(data) {
+          if (scheduleTimer) clearTimeout(scheduleTimer);
+          log("Checkout om " + String(data.hour).padStart(2, '0') + ":" + String(data.min).padStart(2, '0'));
+          log("Over " + Math.round(data.wait_ms / 60000) + " minuten");
+          scheduleTimer = setTimeout(authorizeCheckout, data.wait_ms);
+        })
+        .catch(function() {
+          log("FOUT: Planning mislukt, nieuwe poging over 1 minuut");
+          scheduleTimer = setTimeout(checkout_schedule, 60000);
+        });
+    }
+
+    function authorizeCheckout() {
+      fetch("/api/checkout/authorize?key=" + encodeURIComponent(apiKey) + "&hour=" + hour + "&min=" + min)
+        .then(function(r) { return r.json().then(function(data) { if (!r.ok) throw new Error(data.error || "Checkout niet toegestaan"); return data; }); })
+        .then(function(data) {
+          if (!data.allowed) {
+            scheduleTimer = setTimeout(checkout_schedule, data.wait_ms);
+            return;
+          }
+          if (data.server_day !== lastCheckoutDay) {
+            lastCheckoutDay = data.server_day;
+            trigger_checkout();
+          }
+          checkout_schedule();
+        })
+        .catch(function() {
+          log("FOUT: Checkout kon niet worden vrijgegeven, nieuwe poging over 1 minuut");
+          scheduleTimer = setTimeout(authorizeCheckout, 60000);
+        });
     }
 
     function init() {
       apiKey = getQueryParam("key");
-      hour = parseInt(getQueryParam("hour")) || 11;
-      min = parseInt(getQueryParam("min")) || 0;
+      var requestedHour = parseInt(getQueryParam("hour"), 10);
+      var requestedMin = parseInt(getQueryParam("min"), 10);
+      hour = isNaN(requestedHour) ? 11 : requestedHour;
+      min = isNaN(requestedMin) ? 0 : requestedMin;
       debugOption = getQueryParam("debug") || "off";
 
       if (!apiKey) {
@@ -228,18 +317,12 @@
 
       validateApiKey().then(function(valid) {
         if (!valid) return;
+        startRegistration();
         getSerialNumber(function(serial) {
+          if (!serial) return;
           tvSerialNumber = serial;
-          if (serial) log("Serienummer: " + serial);
-          registerTv().then(function(r) {
-            getTvInfo();
-            if (debugOption === "on") {
-              document.body.style.display = "block";
-            }
-            checkout_schedule();
-          }).catch(function() {
-            log("FOUT: Registratie mislukt");
-          });
+          log("Serienummer: " + serial);
+          registerTv().catch(function() {});
         });
       }).catch(function() {
         log("FOUT: Validatie mislukt");

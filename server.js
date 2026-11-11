@@ -63,6 +63,19 @@ function requireAuth(req, res, next) {
   next();
 }
 
+// Alleen beheerders (gebruikers zonder klantkoppeling)
+function requireAdmin(req, res, next) {
+  if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
+  if (req.session.customerId) return res.status(403).json({ error: 'Geen toegang tot deze actie' });
+  next();
+}
+
+// Beheerder mag alles; klantgebruiker alleen zijn eigen klant
+function canAccessCustomer(req, customerId) {
+  if (!req.session.customerId) return true;
+  return String(req.session.customerId) === String(customerId);
+}
+
 // === Auth ===
 
 app.post('/api/login', (req, res) => {
@@ -73,7 +86,9 @@ app.post('/api/login', (req, res) => {
   }
   req.session.userId = user.id;
   req.session.username = user.username;
-  res.json({ success: true, username: user.username });
+  req.session.role = user.role || 'admin';
+  req.session.customerId = user.customer_id || null;
+  res.json({ success: true, username: user.username, role: user.role || 'admin', customerId: user.customer_id || null });
 });
 
 app.post('/api/logout', (req, res) => {
@@ -83,20 +98,25 @@ app.post('/api/logout', (req, res) => {
 
 app.get('/api/me', (req, res) => {
   if (!req.session.userId) return res.status(401).json({ error: 'Not logged in' });
-  res.json({ username: req.session.username });
+  res.json({ username: req.session.username, role: req.session.role || 'admin', customerId: req.session.customerId || null });
 });
 
 // === Customers ===
 
 app.get('/api/customers', requireAuth, (req, res) => {
+  const userScope = req.session.customerId
+    ? ' WHERE c.id = ?'
+    : '';
+  const params = req.session.customerId ? [req.session.customerId] : [];
   const customers = db.prepare(`
-    SELECT c.*, (SELECT COUNT(*) FROM tvs WHERE customer_id = c.id) as tv_count
-    FROM customers c ORDER BY c.created_at DESC
-  `).all();
+    SELECT c.*, (SELECT COUNT(*) FROM tvs WHERE customer_id = c.id) as tv_count,
+      (SELECT username FROM users WHERE customer_id = c.id AND role = 'customer' LIMIT 1) as dashboard_username
+    FROM customers c${userScope} ORDER BY c.created_at DESC
+  `).all(...params);
   res.json(customers);
 });
 
-app.post('/api/customers', requireAuth, (req, res) => {
+app.post('/api/customers', requireAdmin, (req, res) => {
   const { name, contact_email, tv_limit } = req.body;
   if (!name) return res.status(400).json({ error: 'Naam is verplicht' });
   const apiKey = uuidv4();
@@ -106,7 +126,7 @@ app.post('/api/customers', requireAuth, (req, res) => {
   res.json({ id: result.lastInsertRowid, api_key: apiKey });
 });
 
-app.put('/api/customers/:id', requireAuth, (req, res) => {
+app.put('/api/customers/:id', requireAdmin, (req, res) => {
   const { name, contact_email, tv_limit, active } = req.body;
   db.prepare(
     'UPDATE customers SET name = COALESCE(?, name), contact_email = COALESCE(?, contact_email), tv_limit = COALESCE(?, tv_limit), active = COALESCE(?, active) WHERE id = ?'
@@ -114,25 +134,60 @@ app.put('/api/customers/:id', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
-app.delete('/api/customers/:id', requireAuth, (req, res) => {
+app.delete('/api/customers/:id', requireAdmin, (req, res) => {
   db.prepare('DELETE FROM customers WHERE id = ?').run(req.params.id);
+  db.prepare('DELETE FROM users WHERE customer_id = ? AND role = ?').run(req.params.id, 'customer');
   res.json({ success: true });
 });
 
-app.post('/api/customers/:id/regenerate-key', requireAuth, (req, res) => {
+app.post('/api/customers/:id/regenerate-key', requireAdmin, (req, res) => {
   const newKey = uuidv4();
   db.prepare('UPDATE customers SET api_key = ? WHERE id = ?').run(newKey, req.params.id);
   res.json({ api_key: newKey });
 });
 
+// === Klant-login (dashboard gebruiker) ===
+
+app.post('/api/customers/:id/user', requireAdmin, (req, res) => {
+  const { username, password } = req.body;
+  const customer = db.prepare('SELECT id FROM customers WHERE id = ?').get(req.params.id);
+  if (!customer) return res.status(404).json({ error: 'Klant niet gevonden' });
+
+  const existing = db.prepare('SELECT id, password_hash FROM users WHERE customer_id = ? AND role = ?').get(req.params.id, 'customer');
+  const finalUsername = (username || '').trim();
+  if (!finalUsername) return res.status(400).json({ error: 'Gebruikersnaam is verplicht' });
+  if (!existing && !password) return res.status(400).json({ error: 'Wachtwoord is verplicht' });
+
+  const taken = db.prepare('SELECT id FROM users WHERE username = ? AND id != COALESCE(?, 0)').get(finalUsername, existing ? existing.id : 0);
+  if (taken) return res.status(400).json({ error: 'Gebruikersnaam is al in gebruik' });
+
+  if (existing) {
+    const hash = password ? bcrypt.hashSync(password, 10) : existing.password_hash;
+    db.prepare('UPDATE users SET username = ?, password_hash = ? WHERE id = ?').run(finalUsername, hash, existing.id);
+  } else {
+    const hash = bcrypt.hashSync(password, 10);
+    db.prepare('INSERT INTO users (username, password_hash, customer_id, role) VALUES (?, ?, ?, ?)').run(finalUsername, hash, req.params.id, 'customer');
+  }
+  res.json({ success: true, username: finalUsername });
+});
+
 // === TVs ===
 
 app.get('/api/customers/:id/tvs', requireAuth, (req, res) => {
-  const tvs = db.prepare('SELECT * FROM tvs WHERE customer_id = ? ORDER BY created_at ASC').all(req.params.id);
+  if (!canAccessCustomer(req, req.params.id)) return res.status(403).json({ error: 'Geen toegang' });
+  const tvs = db.prepare(`
+    SELECT t.*,
+      CASE WHEN EXISTS (
+        SELECT 1 FROM wipe_commands w
+        WHERE w.customer_id = t.customer_id AND (w.tv_id IS NULL OR w.tv_id = t.id)
+          AND w.id > COALESCE(t.last_wipe_command_id, 0)
+      ) THEN 1 ELSE 0 END as pending_wipe
+    FROM tvs t WHERE t.customer_id = ? ORDER BY t.created_at ASC
+  `).all(req.params.id);
   res.json(tvs);
 });
 
-app.post('/api/customers/:id/tvs', requireAuth, (req, res) => {
+app.post('/api/customers/:id/tvs', requireAdmin, (req, res) => {
   const { label, room_name } = req.body;
   const customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(req.params.id);
   if (!customer) return res.status(404).json({ error: 'Klant niet gevonden' });
@@ -146,7 +201,7 @@ app.post('/api/customers/:id/tvs', requireAuth, (req, res) => {
   res.json({ id: result.lastInsertRowid });
 });
 
-app.put('/api/tvs/:id', requireAuth, (req, res) => {
+app.put('/api/tvs/:id', requireAdmin, (req, res) => {
   const { label, room_name } = req.body;
   db.prepare(
     'UPDATE tvs SET label = COALESCE(?, label), room_name = COALESCE(?, room_name) WHERE id = ?'
@@ -154,15 +209,36 @@ app.put('/api/tvs/:id', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
-app.delete('/api/tvs/:id', requireAuth, (req, res) => {
+app.delete('/api/tvs/:id', requireAdmin, (req, res) => {
   db.prepare('DELETE FROM tvs WHERE id = ?').run(req.params.id);
   res.json({ success: true });
+});
+
+// === Handmatig wissen (wipe) ===
+// Beheerder of de klantgebruiker zelf kan een wis-verzoek klaarzetten. De TV
+// (iframe) pollt dit op en voert idcap://tv/checkout/request uit.
+
+app.post('/api/customers/:id/wipe', requireAuth, (req, res) => {
+  if (!canAccessCustomer(req, req.params.id)) return res.status(403).json({ error: 'Geen toegang' });
+  const customer = db.prepare('SELECT id FROM customers WHERE id = ?').get(req.params.id);
+  if (!customer) return res.status(404).json({ error: 'Klant niet gevonden' });
+
+  const tvId = req.body.tv_id || null;
+  if (tvId) {
+    const tv = db.prepare('SELECT id FROM tvs WHERE id = ? AND customer_id = ?').get(tvId, req.params.id);
+    if (!tv) return res.status(404).json({ error: 'TV niet gevonden' });
+  }
+  const result = db.prepare('INSERT INTO wipe_commands (customer_id, tv_id, requested_by) VALUES (?, ?, ?)')
+    .run(req.params.id, tvId, req.session.userId);
+  res.json({ success: true, command_id: result.lastInsertRowid });
 });
 
 // === Checkout Logs ===
 
 app.get('/api/logs', requireAuth, (req, res) => {
-  const { customer_id, limit = 50, offset = 0 } = req.query;
+  const { limit = 50, offset = 0 } = req.query;
+  // Klantgebruiker ziet alleen de eigen logs
+  const customerId = req.session.customerId ? req.session.customerId : req.query.customer_id;
   let sql = `
     SELECT l.*, c.name as customer_name, t.label as tv_label, t.room_name
     FROM checkout_logs l
@@ -170,23 +246,28 @@ app.get('/api/logs', requireAuth, (req, res) => {
     LEFT JOIN tvs t ON l.tv_id = t.id
   `;
   const params = [];
-  if (customer_id) {
+  if (customerId) {
     sql += ' WHERE l.customer_id = ?';
-    params.push(customer_id);
+    params.push(customerId);
   }
   sql += ' ORDER BY l.created_at DESC LIMIT ? OFFSET ?';
   params.push(parseInt(limit), parseInt(offset));
   const logs = db.prepare(sql).all(...params);
-  const total = db.prepare('SELECT COUNT(*) as c FROM checkout_logs' + (customer_id ? ' WHERE customer_id = ?' : '')).get(...(customer_id ? [customer_id] : [])).c;
+  const total = db.prepare('SELECT COUNT(*) as c FROM checkout_logs' + (customerId ? ' WHERE customer_id = ?' : '')).get(...(customerId ? [customerId] : [])).c;
   res.json({ logs, total });
 });
 
 app.get('/api/stats', requireAuth, (req, res) => {
-  const totalCustomers = db.prepare('SELECT COUNT(*) as c FROM customers').get().c;
-  const activeCustomers = db.prepare('SELECT COUNT(*) as c FROM customers WHERE active = 1').get().c;
-  const totalTvs = db.prepare('SELECT COUNT(*) as c FROM tvs').get().c;
-  const todayLogs = db.prepare("SELECT COUNT(*) as c FROM checkout_logs WHERE date(created_at) = date('now')").get().c;
-  const successToday = db.prepare("SELECT COUNT(*) as c FROM checkout_logs WHERE date(created_at) = date('now') AND success = 1").get().c;
+  const cust = req.session.customerId;
+  const customersWhere = cust ? ' WHERE id = ?' : '';
+  const tvsWhere = cust ? ' WHERE customer_id = ?' : '';
+  const logsWhere = cust ? ' WHERE customer_id = ?' : '';
+  const p = cust ? [cust] : [];
+  const totalCustomers = db.prepare('SELECT COUNT(*) as c FROM customers' + customersWhere).get(...p).c;
+  const activeCustomers = db.prepare('SELECT COUNT(*) as c FROM customers WHERE active = 1' + (cust ? ' AND id = ?' : '')).get(...p).c;
+  const totalTvs = db.prepare('SELECT COUNT(*) as c FROM tvs' + tvsWhere).get(...p).c;
+  const todayLogs = db.prepare("SELECT COUNT(*) as c FROM checkout_logs WHERE date(created_at) = date('now')" + (cust ? ' AND customer_id = ?' : '')).get(...p).c;
+  const successToday = db.prepare("SELECT COUNT(*) as c FROM checkout_logs WHERE date(created_at) = date('now') AND success = 1" + (cust ? ' AND customer_id = ?' : '')).get(...p).c;
   res.json({ totalCustomers, activeCustomers, totalTvs, todayLogs, successToday });
 });
 
@@ -285,6 +366,70 @@ app.get('/api/checkout/validate', (req, res) => {
   res.json({ valid: true, customer_id: customer.id, customer_name: customer.name });
 });
 
+function getCheckoutTime(req, res) {
+  const hour = req.query.hour === undefined ? 11 : Number(req.query.hour);
+  const min = req.query.min === undefined ? 0 : Number(req.query.min);
+  if (!Number.isInteger(hour) || hour < 0 || hour > 23 || !Number.isInteger(min) || min < 0 || min > 59) {
+    res.status(400).json({ error: 'Ongeldige checkouttijd' });
+    return null;
+  }
+  return { hour, min };
+}
+
+function getLocalDay(date) {
+  return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+}
+
+function getNextCheckoutTarget(hour, min, now) {
+  const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, min, 0, 0);
+  if (target <= now) target.setDate(target.getDate() + 1);
+  return target;
+}
+
+function requireActiveCheckoutKey(req, res) {
+  const key = req.query.key;
+  if (!key) {
+    res.status(400).json({ error: 'API key is verplicht' });
+    return false;
+  }
+  const customer = db.prepare('SELECT id FROM customers WHERE api_key = ? AND active = 1').get(key);
+  if (!customer) {
+    res.status(404).json({ error: 'Ongeldige of gedeactiveerde API key' });
+    return false;
+  }
+  return true;
+}
+
+app.get('/api/checkout/schedule', (req, res) => {
+  if (!requireActiveCheckoutKey(req, res)) return;
+  const checkoutTime = getCheckoutTime(req, res);
+  if (!checkoutTime) return;
+  const now = new Date();
+  const target = getNextCheckoutTarget(checkoutTime.hour, checkoutTime.min, now);
+  res.json({
+    server_now: now.toISOString(),
+    server_day: getLocalDay(now),
+    wait_ms: Math.max(1000, target.getTime() - now.getTime()),
+    hour: checkoutTime.hour,
+    min: checkoutTime.min
+  });
+});
+
+app.get('/api/checkout/authorize', (req, res) => {
+  if (!requireActiveCheckoutKey(req, res)) return;
+  const checkoutTime = getCheckoutTime(req, res);
+  if (!checkoutTime) return;
+  const now = new Date();
+  const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), checkoutTime.hour, checkoutTime.min, 0, 0);
+  const allowed = now >= target;
+  res.json({
+    allowed,
+    server_now: now.toISOString(),
+    server_day: getLocalDay(now),
+    wait_ms: allowed ? 0 : Math.max(1000, target.getTime() - now.getTime())
+  });
+});
+
 app.post('/api/checkout/log', (req, res) => {
   const { api_key, device_id, success, error_message, ip_address, user_agent } = req.body;
   const customer = db.prepare('SELECT id FROM customers WHERE api_key = ?').get(api_key);
@@ -311,6 +456,35 @@ app.post('/api/checkout/log', (req, res) => {
   res.json({ success: true });
 });
 
+// === Handmatig wissen: TV-poll endpoints (geen sessie, API key) ===
+
+app.get('/api/checkout/wipe/pending', (req, res) => {
+  const { key, device_id } = req.query;
+  if (!key || !device_id) return res.status(400).json({ pending: false });
+  const customer = db.prepare('SELECT id FROM customers WHERE api_key = ? AND active = 1').get(key);
+  if (!customer) return res.status(404).json({ pending: false });
+  const tv = db.prepare('SELECT id, last_wipe_command_id FROM tvs WHERE customer_id = ? AND device_id = ?').get(customer.id, device_id);
+  if (!tv) return res.json({ pending: false });
+  const cmd = db.prepare(`
+    SELECT id FROM wipe_commands
+    WHERE customer_id = ? AND (tv_id IS NULL OR tv_id = ?) AND id > COALESCE(?, 0)
+    ORDER BY id DESC LIMIT 1
+  `).get(customer.id, tv.id, tv.last_wipe_command_id);
+  res.json({ pending: !!cmd, command_id: cmd ? cmd.id : null });
+});
+
+app.post('/api/checkout/wipe/complete', (req, res) => {
+  const { api_key, device_id, command_id } = req.body;
+  if (!api_key || !device_id || !command_id) return res.status(400).json({ error: 'missende velden' });
+  const customer = db.prepare('SELECT id FROM customers WHERE api_key = ?').get(api_key);
+  if (!customer) return res.status(404).end();
+  const tv = db.prepare('SELECT id FROM tvs WHERE customer_id = ? AND device_id = ?').get(customer.id, device_id);
+  if (!tv) return res.status(404).end();
+  db.prepare('UPDATE tvs SET last_wipe_command_id = ? WHERE id = ? AND (last_wipe_command_id IS NULL OR last_wipe_command_id < ?)')
+    .run(parseInt(command_id), tv.id, parseInt(command_id));
+  res.json({ success: true });
+});
+
 // === ACME / Let's Encrypt webroot ===
 // Certbot schrijft hier de HTTP-01 challenge-bestanden. Zo kan het certificaat
 // vernieuwd worden zonder poort 80 te binden (die is door deze app in gebruik).
@@ -330,7 +504,11 @@ app.get('/admin/:page', (req, res) => {
 
 // === Checkout page ===
 
-app.use(express.static(path.join(__dirname, 'app')));
+app.use(express.static(path.join(__dirname, 'app'), {
+  setHeaders: (res, filePath) => {
+    if (path.basename(filePath) === 'index.html') res.setHeader('Cache-Control', 'no-store');
+  }
+}));
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'app', 'index.html'));

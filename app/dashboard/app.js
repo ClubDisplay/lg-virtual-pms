@@ -18,7 +18,8 @@ function navigate(hash) {
   render();
 }
 
-let state = { view: 'login', customerId: null };
+let state = { view: 'login', customerId: null, dashboardUsername: '' };
+let currentUser = null;
 
 function render() {
   closeModal();
@@ -57,12 +58,20 @@ window.doLogin = async function() {
   const u = document.getElementById('username').value;
   const p = document.getElementById('password').value;
   const res = await api('/login', { method: 'POST', body: JSON.stringify({ username: u, password: p }) });
-  if (res.ok) navigate('dashboard');
-  else document.getElementById('loginError').textContent = res.data.error || 'Fout bij inloggen';
+  if (res.ok) {
+    currentUser = { username: res.data.username, role: res.data.role || 'admin', customerId: res.data.customerId || null };
+    if (currentUser.role === 'customer' && currentUser.customerId) navigate('customer/' + currentUser.customerId);
+    else navigate('dashboard');
+  } else {
+    document.getElementById('loginError').textContent = res.data.error || 'Fout bij inloggen';
+  }
 };
 
 // === Dashboard ===
 function renderDashboard(app) {
+  if (currentUser && currentUser.role === 'customer' && currentUser.customerId) {
+    return navigate('customer/' + currentUser.customerId);
+  }
   api('/me').then(r => {
     if (!r.ok) return navigate('login');
     api('/stats').then(s => {
@@ -83,6 +92,16 @@ function renderDashboard(app) {
 }
 
 function layout(content, active) {
+  const isCustomer = currentUser && currentUser.role === 'customer';
+  const customerId = currentUser && currentUser.customerId;
+  const nav = isCustomer ? `
+          <a class="${active === 'customer' ? 'active' : ''}" onclick="navigate('customer/${customerId}')"><span class="icon">🏨</span> <span>Mijn omgeving</span></a>
+          <a class="${active === 'logs' ? 'active' : ''}" onclick="navigate('logs')"><span class="icon">📋</span> <span>Checkout logs</span></a>
+        ` : `
+          <a class="${active === 'dashboard' ? 'active' : ''}" onclick="navigate('dashboard')"><span class="icon">📊</span> <span>Dashboard</span></a>
+          <a class="${active === 'customers' ? 'active' : ''}" onclick="navigate('customers')"><span class="icon">👥</span> <span>Klanten</span></a>
+          <a class="${active === 'logs' ? 'active' : ''}" onclick="navigate('logs')"><span class="icon">📋</span> <span>Checkout logs</span></a>
+        `;
   return `
     <div class="dashboard">
       <div class="sidebar">
@@ -90,11 +109,7 @@ function layout(content, active) {
           <img src="LogoCDVP.png" alt="CDVP" style="max-width: 140px; height: auto; display: block; margin: 0 auto 10px;">
           <div style="font-size: 16px; color: rgba(255,255,255,0.7); letter-spacing: 2px; font-weight: 600;">Virtual PMS</div>
         </div>
-        <nav>
-          <a class="${active === 'dashboard' ? 'active' : ''}" onclick="navigate('dashboard')"><span class="icon">📊</span> <span>Dashboard</span></a>
-          <a class="${active === 'customers' ? 'active' : ''}" onclick="navigate('customers')"><span class="icon">👥</span> <span>Klanten</span></a>
-          <a class="${active === 'logs' ? 'active' : ''}" onclick="navigate('logs')"><span class="icon">📋</span> <span>Checkout logs</span></a>
-        </nav>
+        <nav>${nav}</nav>
         <button class="logout-btn" onclick="doLogout()">Uitloggen</button>
       </div>
       <div class="main">${content}</div>
@@ -172,42 +187,58 @@ function renderCustomer(app) {
     api('/customers').then(cr => {
       const customer = cr.data.find(c => String(c.id) === cid);
       if (!customer) return app.innerHTML = layout('<div class="empty">Klant niet gevonden</div>', 'customers');
+      const isAdmin = !currentUser || currentUser.role !== 'customer';
+      state.dashboardUsername = customer.dashboard_username || '';
       api('/customers/' + cid + '/tvs').then(tvr => {
         const tvs = tvr.data;
         app.innerHTML = layout(`
-          <a class="back-link" onclick="navigate('customers')">← Terug naar klanten</a>
+          ${isAdmin ? '<a class="back-link" onclick="navigate(\'customers\')">← Terug naar klanten</a>' : ''}
           <div class="detail-header">
             <h1>${escapeHtml(customer.name)}</h1>
             <div>
+              <button class="btn btn-warning" onclick="wipeAll(${customer.id})">Wis alle TV's handmatig</button>
+              ${isAdmin ? `
               <button class="btn btn-ghost" onclick="regenerateKey(${customer.id})">Nieuwe API key</button>
               <button class="btn btn-ghost" onclick="toggleCustomerStatus(${customer.id}, ${customer.active})">${customer.active ? 'Deactiveer' : 'Activeer'}</button>
+              ` : ''}
             </div>
           </div>
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">
-            <div class="stat-card"><div class="label">API Key</div>
-              <div class="api-key"><span id="apiKeyValue">${customer.api_key}</span>
-                <button onclick="copyKey()">Kopiëren</button>
-              </div>
-            </div>
             <div class="stat-card"><div class="label">Status</div>
               <div><span class="badge ${customer.active ? 'active' : 'inactive'}">${customer.active ? 'Actief' : 'Inactief'}</span></div>
             </div>
             <div class="stat-card"><div class="label">TV's toegevoegd</div><div class="value orange">${tvs.length} / ${customer.tv_limit}</div></div>
-            <div class="stat-card"><div class="label">Aangemaakt</div><div>${new Date(customer.created_at).toLocaleDateString('nl-NL')}</div></div>
           </div>
 
-          <div class="stat-card" style="grid-column:1/-1">
+          ${isAdmin ? `
+          <div class="stat-card" style="margin-bottom:24px">
+            <div class="label">API Key</div>
+            <div class="api-key"><span id="apiKeyValue">${customer.api_key}</span>
+              <button onclick="copyKey()">Kopiëren</button>
+            </div>
+          </div>
+
+          <div class="stat-card" style="margin-bottom:24px">
             <div class="label">Widget code — plak dit in PCC tekst widget (HTML modus)</div>
             <div class="api-key"><span id="widgetCode" style="font-size:12px;white-space:pre-wrap;word-break:break-all">&lt;iframe src="https://pms.clubdisplay.nl/?key=${customer.api_key}&amp;hour=11&amp;min=0" sandbox="allow-scripts allow-same-origin" style="width:100%;height:100%;border:none"&gt;&lt;/iframe&gt;</span>
               <button onclick="copyWidget()">Kopieer code</button>
             </div>
           </div>
 
+          <div class="stat-card" style="margin-bottom:24px">
+            <div class="label">Dashboard gebruiker (klant-login)</div>
+            <div id="dashboardUserInfo" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+              <span>${customer.dashboard_username ? 'Gebruiker: <strong>' + escapeHtml(customer.dashboard_username) + '</strong>' : 'Nog geen login ingesteld'}</span>
+              <button class="btn btn-ghost" onclick="showSetUser(${customer.id})">${customer.dashboard_username ? 'Wijzigen' : 'Instellen'}</button>
+            </div>
+          </div>
+          ` : ''}
+
           <h2 style="margin-bottom:12px">TV's</h2>
           <div class="toolbar" style="margin-bottom:12px">
             <span style="font-size:13px;color:#888">${tvs.length} van ${customer.tv_limit} TV's gebruikt</span>
-            ${tvs.length < customer.tv_limit ? '<button class="btn btn-primary btn-sm" onclick="showAddTv(' + customer.id + ')">+ TV toevoegen</button>' : ''}
+            ${isAdmin && tvs.length < customer.tv_limit ? '<button class="btn btn-primary btn-sm" onclick="showAddTv(' + customer.id + ')">+ TV toevoegen</button>' : ''}
           </div>
           <div class="table-container">
             ${tvs.length === 0 ? '<div class="empty">Nog geen TV\'s toegevoegd</div>' : `
@@ -220,10 +251,13 @@ function renderCustomer(app) {
                   <td>${escapeHtml(t.room_name) || '-'}</td>
                   <td style="font-size:12px;color:#888;font-family:monospace">${t.device_id || '-'}</td>
                   <td>${t.last_checkout ? new Date(t.last_checkout).toLocaleString('nl-NL') : '-'}</td>
-                  <td>${t.last_checkout_ok === 1 ? '<span class="badge success">OK</span>' : t.last_checkout_ok === 0 ? '<span class="badge error">Mislukt</span>' : '-'}</td>
+                  <td>${t.pending_wipe ? '<span class="badge warn">Wis-verzoek</span>' : (t.last_checkout_ok === 1 ? '<span class="badge success">OK</span>' : t.last_checkout_ok === 0 ? '<span class="badge error">Mislukt</span>' : '-')}</td>
                   <td nowrap>
+                    <button class="btn btn-warning btn-sm" onclick="wipeTv(${customer.id}, ${t.id})">Wis handmatig</button>
+                    ${isAdmin ? `
                     <button class="btn btn-ghost btn-sm" onclick="renameTv(${t.id}, '${escapeHtml(t.label)}')">Hernoem</button>
                     <button class="btn btn-danger btn-sm" onclick="deleteTv(${t.id})">Verwijder</button>
+                    ` : ''}
                   </td>
                 </tr>
               `).join('')}</tbody>
@@ -232,7 +266,7 @@ function renderCustomer(app) {
 
           <h2 style="margin:24px 0 12px">Checkout logs</h2>
           <div class="table-container" id="customerLogs"><div class="empty">Laden...</div></div>
-        `, 'customers');
+        `, isAdmin ? 'customers' : 'customer');
 
         loadCustomerLogs(cid);
       });
@@ -344,6 +378,48 @@ window.toggleCustomerStatus = async function(id, currentActive) {
   navigate('customer/' + id);
 };
 
+window.wipeTv = async function(customerId, tvId) {
+  if (!confirm('Weet je zeker dat je de gast-sessies van deze TV nu wilt wissen?')) return;
+  const res = await api('/customers/' + customerId + '/wipe', { method: 'POST', body: JSON.stringify({ tv_id: tvId }) });
+  if (res.ok) {
+    alert('Wis-verzoek verzonden. De TV voert het wissen uit zodra deze de opdracht oppikt (binnen ~30 seconden).');
+    navigate('customer/' + customerId);
+  } else {
+    alert(res.data.error || 'Fout bij verzenden');
+  }
+};
+
+window.wipeAll = async function(customerId) {
+  if (!confirm('Weet je zeker dat je de gast-sessies van alle TV\'s van deze klant nu wilt wissen?')) return;
+  const res = await api('/customers/' + customerId + '/wipe', { method: 'POST', body: JSON.stringify({}) });
+  if (res.ok) {
+    alert('Wis-verzoek verzonden naar alle TV\'s. De TV\'s voeren het wissen uit zodra ze de opdracht oppikken (binnen ~30 seconden).');
+    navigate('customer/' + customerId);
+  } else {
+    alert(res.data.error || 'Fout bij verzenden');
+  }
+};
+
+window.showSetUser = function(customerId) {
+  const currentUsername = state.dashboardUsername || '';
+  showModal('Dashboard gebruiker', `
+    <div class="form-group"><label>Gebruikersnaam</label><input id="f_username" value="${escapeHtml(currentUsername)}" placeholder="Bijv. bioscoop"></div>
+    <div class="form-group"><label>${currentUsername ? 'Nieuw wachtwoord (leeg laten om te behouden)' : 'Wachtwoord'}</label><input id="f_password" type="password" placeholder="Wachtwoord"></div>
+    <p style="font-size:12px;color:#888">Deze gebruiker kan inloggen en ziet alleen de eigen omgeving (TV's + handmatig wissen).</p>
+  `, async () => {
+    const username = document.getElementById('f_username').value.trim();
+    const password = document.getElementById('f_password').value;
+    const res = await api('/customers/' + customerId + '/user', { method: 'POST', body: JSON.stringify({ username, password }) });
+    closeModal();
+    if (res.ok) {
+      alert('Gebruiker opgeslagen: ' + res.data.username);
+      navigate('customer/' + customerId);
+    } else {
+      alert(res.data.error || 'Fout bij opslaan');
+    }
+  });
+};
+
 // === Logs ===
 function renderLogs(app) {
   api('/me').then(r => {
@@ -403,7 +479,12 @@ window.closeModal = function() {
 window.addEventListener('hashchange', render);
 window.addEventListener('load', () => {
   api('/me').then(r => {
-    if (r.ok) navigate(window.location.hash.slice(1) || 'customers');
-    else navigate('login');
+    if (!r.ok) return navigate('login');
+    currentUser = r.data;
+    if (currentUser.role === 'customer' && currentUser.customerId) {
+      navigate('customer/' + currentUser.customerId);
+    } else {
+      navigate(window.location.hash.slice(1) || 'customers');
+    }
   });
 });

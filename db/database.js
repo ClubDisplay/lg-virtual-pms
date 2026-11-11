@@ -61,6 +61,14 @@ function initTables() {
       error_message TEXT,
       created_at TEXT DEFAULT (datetime('now', 'localtime'))
     );
+
+    CREATE TABLE IF NOT EXISTS wipe_commands (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      tv_id INTEGER REFERENCES tvs(id) ON DELETE CASCADE,
+      requested_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
+    );
   `);
 
   // Migration: add device_id column if it doesn't exist yet
@@ -76,6 +84,19 @@ function initTables() {
   // Migration: add serial_number column
   try {
     db.exec(`ALTER TABLE tvs ADD COLUMN serial_number TEXT`);
+  } catch(e) {}
+
+  // Migration: users krijgen een rol (admin) en optionele koppeling aan een klant
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN customer_id INTEGER`);
+  } catch(e) {}
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'`);
+  } catch(e) {}
+
+  // Migration: per TV bijhouden tot welk handmatig wis-verzoek is uitgevoerd
+  try {
+    db.exec(`ALTER TABLE tvs ADD COLUMN last_wipe_command_id INTEGER NOT NULL DEFAULT 0`);
   } catch(e) {}
 
   const count = db.prepare('SELECT COUNT(*) as c FROM users').get();
