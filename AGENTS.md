@@ -39,6 +39,13 @@ LG webOS auto-checkout systeem met beheerdashboard.
 - **Dagelijkse automatische checkout (11:00)** kan per klant uitgezet worden (bijv. bioscoop: alleen handmatig wissen). Handmatig wissen blijft dan gewoon werken.
 - **TV herstarten na checkout** — nodig voor 24/7 aanstaande TV's (bijv. bioscoop). `idcap://tv/checkout/request` wist de gast-data, maar een lopende app (Netflix) leest die gewiste data pas opnieuw bij een herstart. Met deze optie aan stuurt de TV na elke succesvolle checkout (handmatig én dagelijks) `idcap://system/reboot`.
 - Beide staan op de klantpagina (alleen admin) onder "Checkout instellingen". `/api/checkout/validate` geeft de instellingen terug aan de TV.
+- **Belangrijke beperking (bioscoop-TV):** de IDCAP-interface van deze TV ondersteunt ALLEEN `tv/checkout/request`, `system/info/get` en `network/configuration/get`. `system/reboot`, `tv/power/off` en `app/list/get` geven `unknown command`. Daardoor kan de TV **niet** via IDCAP herstarten of apps sluiten → de checkout wist de gast-sessie, maar Netflix blijft ingelogd tot een fysieke stroomonderbreking. Voor de bioscoop doet men het volledige uitloggen daarom **handmatig via de check-out in de Pro:Centric-server**.
+
+## Auto-reload / code-versie
+
+- `CHECKOUT_CODE_VERSION` in `server.js` en `codeVersion` in `app/index.html` moeten **altijd samen** opgehoogd worden bij een code-wijziging.
+- De TV pollt `/api/checkout/wipe/pending` (~15s) en herlaadt zichzelf (`location.reload()`) als de server een andere versie meldt. De root-route `/` redirect naar `/?...&v=<versie>` zodat TV-browsers die `Cache-Control: no-store` negeren tóch verse code laden.
+- Hierdoor is een handmatige uit/aan van de TV na een deploy niet meer nodig.
 
 ## Checkout flow (iframe kant)
 
@@ -117,6 +124,8 @@ pm2 start ecosystem.config.cjs  # Productie met PM2
 3. **Error-handler malformed JSON** — scanners die form-data naar een JSON-endpoint sturen (bijv. `0x[]=DTAB`) veroorzaakten stacktrace-ruis in de error-log; nu netjes een schone `400` zonder stacktrace.
 4. **Optionele herstart na checkout** — `idcap://tv/checkout/request` wist de gast-data wel, maar een **lopende** app (Netflix) leest die gewiste data pas opnieuw bij een herstart. Voor installaties waar de TV/STB 24/7 aanstaat (bijv. bioscoop) kan per klant "TV herstarten na checkout" aan; na elke succesvolle checkout wordt dan `idcap://system/reboot` uitgevoerd. Default uit, dus hotels merken niets.
 5. **Per klant `daily_checkout` + `checkout_reboot`** — dagelijkse 11:00-checkout kan per klant uit (bioscoop: alleen handmatig), en herstart na checkout kan per klant aan. Zie *Checkout-instellingen per klant*.
+6. **Auto-reload + cache-busting** — `CHECKOUT_CODE_VERSION`/`codeVersion` (samen bumpen) + redirect `/` → `/?&v=N`. TV herlaadt zichzelf automatisch; geen handmatige power cycle meer na deploys. Zie *Auto-reload / code-versie*.
+7. **IDCAP-limiet bioscoop-TV ontdekt** — deze TV ondersteunt alleen checkout/info/network; `system/reboot`, `tv/power/off`, `app/list/get` = `unknown command`. Besloten: volledig uitloggen (Netflix) doet de bioscoop handmatig via de check-out in de Pro:Centric-server. Onze knop "Wis login gast" blijft de gast-sessie wissen.
 
 ### 2026-10-19
 
@@ -138,7 +147,7 @@ pm2 start ecosystem.config.cjs  # Productie met PM2
 
 ### Aandachtspunten voor later
 
-- **Bioscoop = klant "The Spareroom"** (sinds 2026-11-11): `daily_checkout=UIT`, `checkout_reboot=AAN` → alleen handmatig wissen + herstart na checkout. Na de code-update van 2026-11-11 moest de bioscoop-TV één keer herstarten (uit/aan) om de nieuwe pagina-code te laden; daarna werkt het automatisch.
+- **Bioscoop = klant "The Spareroom"** (sinds 2026-11-11): `daily_checkout=UIT`, `checkout_reboot=AAN` → alleen handmatig wissen. De TV kan niet via IDCAP herstarten (beperkte command-set), dus voor het échte uitloggen van Netflix gebruikt men de check-out in de Pro:Centric-server.
 - De **laatste 8 TV's van Magnifigue X** (van 19) waren nog niet geregistreerd toen ze werden geïnstalleerd; ze registreren zich zodra ze de portal-pagina laden (uit/aan). `tv_limit` = 19, dus er is ruimte.
 - 4 oudere TV's (2× Anna House, 2× De Smulpot, waarvan 1 test-TV `tv-test-manual`) hebben **nooit** uitgecheckt — even controleren of die nog actief zijn.
 - Bij een **nieuw (sub)domein** voor de checkout: voeg het toe aan het certbot-certificaat én check dat het niet in de Pro:Centric-CSP hoeft (alleen editor-preview).
