@@ -397,7 +397,7 @@ window.wipeTv = async function(customerId, tvId) {
   if (!confirm('Weet je zeker dat je de gast-sessies van deze TV nu wilt wissen?')) return;
   const res = await api('/customers/' + customerId + '/wipe', { method: 'POST', body: JSON.stringify({ tv_id: tvId }) });
   if (res.ok) {
-    alert('Wis-verzoek verzonden. De TV voert het wissen uit zodra deze de opdracht oppikt (binnen ~30 seconden).');
+    alert('Wis-verzoek verzonden. De TV voert het wissen uit zodra deze de opdracht oppikt (binnen ~30 seconden).\n\nZet de TV daarna even uit en aan om Netflix volledig uit te loggen.');
     navigate('customer/' + customerId);
   } else {
     alert(res.data.error || 'Fout bij verzenden');
@@ -408,7 +408,7 @@ window.wipeAll = async function(customerId) {
   if (!confirm('Weet je zeker dat je de gast-sessies van alle TV\'s van deze klant nu wilt wissen?')) return;
   const res = await api('/customers/' + customerId + '/wipe', { method: 'POST', body: JSON.stringify({}) });
   if (res.ok) {
-    alert('Wis-verzoek verzonden naar alle TV\'s. De TV\'s voeren het wissen uit zodra ze de opdracht oppikken (binnen ~30 seconden).');
+    alert('Wis-verzoek verzonden naar alle TV\'s. De TV\'s voeren het wissen uit zodra ze de opdracht oppikken (binnen ~30 seconden).\n\nZet de TV\'s daarna even uit en aan om Netflix volledig uit te loggen.');
     navigate('customer/' + customerId);
   } else {
     alert(res.data.error || 'Fout bij verzenden');
